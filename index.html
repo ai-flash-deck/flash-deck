@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0C1422">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ML Deck">
+<title>The AI/ML Interview Deck — Flashcards for Technical Interviews</title>
+<meta name="description" content="A curated flip-card study deck covering the essential ML, deep learning, LLM/Transformer, probability, and RL concepts asked in highly technical AI/ML interviews — each with equations, diagrams, and source links.">
+
+<style>
+  :root {
+    /* Control-panel / reward-signal palette */
+    --ground:      #0C1422;
+    --ground-2:    #0F1A2C;
+    --panel:       #15233E;
+    --panel-line:  #25395C;
+    --paper:       #F6F3EA;
+    --paper-2:     #ECE7D8;
+    --ink:         #1B2433;
+    --ink-soft:    #4A5566;
+    --light:       #E8EEF6;
+    --muted:       #7E8DA3;
+    --amber:       #F4A63B;
+    --teal:        #37C2A8;
+    --teal-deep:   #167a6c;
+
+    --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --font-mono: "Cascadia Code", Consolas, ui-monospace, monospace;
+
+    --r: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--font-sans);
+    color: var(--light);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(55,194,168,0.10), transparent 60%),
+      radial-gradient(1000px 500px at 0% 0%, rgba(244,166,59,0.08), transparent 55%),
+      var(--ground);
+    background-attachment: fixed;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(28px, 5vw, 64px) clamp(16px, 4vw, 40px) 80px;
+  }
+
+  /* ---------- Header ---------- */
+  header { margin-bottom: 36px; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin: 0 0 14px;
+  }
+  .eyebrow .sig { color: var(--amber); margin-right: 10px; }
+
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.25rem);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  h1 em { font-style: normal; color: var(--amber); }
+
+  .lede {
+    max-width: 64ch;
+    color: var(--muted);
+    font-size: 1.02rem;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 30px 0 26px;
+    padding-top: 22px;
+    border-top: 1px solid var(--panel-line);
+  }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .chip {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    background: var(--ground-2);
+    border: 1px solid var(--panel-line);
+    padding: 7px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color .18s, border-color .18s, background .18s;
+  }
+  .chip:hover { color: var(--light); border-color: var(--teal-deep); }
+  .chip[aria-pressed="true"] {
+    color: var(--ground);
+    background: var(--teal);
+    border-color: var(--teal);
+    font-weight: 600;
+  }
+
+  .count {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .count b { color: var(--amber); }
+
+  /* ---------- Grid ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  /* ---------- Card ---------- */
+  .card {
+    position: relative;
+    height: 372px;
+    perspective: 1600px;
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+    background: none;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+  }
+  .card:focus-visible { outline: none; }
+  .card:focus-visible .face { outline: 2px solid var(--amber); outline-offset: 3px; }
+
+  .inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform .55s cubic-bezier(.4, .12, .2, 1);
+  }
+  .card.flipped .inner { transform: rotateY(180deg); }
+
+  .face {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--r);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Front */
+  .front {
+    background: linear-gradient(160deg, #1B2C4B, #13203A);
+    border: 1px solid var(--panel-line);
+    padding: 24px;
+    box-shadow: 0 18px 40px -28px rgba(0,0,0,0.9);
+  }
+  .front::after {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: linear-gradient(var(--amber), var(--teal));
+    opacity: .85;
+  }
+
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ground);
+    background: var(--amber);
+    padding: 4px 10px;
+    border-radius: 6px;
+    align-self: flex-start;
+    font-weight: 600;
+  }
+  .tag.dl     { background: var(--teal); }
+  .tag.llm    { background: #C9A0FF; }
+  .tag.rl     { background: #FF9F87; }
+  .tag.stats  { background: #8FC4FF; }
+
+  .q {
+    font-size: 1.28rem;
+    line-height: 1.32;
+    font-weight: 600;
+    color: var(--light);
+    margin: 20px 0 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    text-wrap: pretty;
+  }
+
+  .reveal {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .reveal .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 0 0 rgba(244,166,59,.6);
+    animation: pulse 2.4s infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(244,166,59,.55); }
+    70%  { box-shadow: 0 0 0 7px rgba(244,166,59,0); }
+    100% { box-shadow: 0 0 0 0 rgba(244,166,59,0); }
+  }
+
+  /* Back */
+  .back {
+    transform: rotateY(180deg);
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--paper-2);
+    box-shadow: 0 18px 40px -28px rgba(0,0,0,0.9);
+  }
+
+  .back-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--paper-2);
+    background: var(--paper-2);
+  }
+  .back-head .lbl {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .flip-back {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--teal-deep);
+    background: transparent;
+    border: 1px solid var(--teal-deep);
+    border-radius: 7px;
+    padding: 4px 9px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .flip-back:hover { background: var(--teal-deep); color: var(--paper); }
+
+  .back-scroll {
+    overflow-y: auto;
+    padding: 16px 18px 18px;
+    flex: 1;
+    scrollbar-width: thin;
+    scrollbar-color: #c7c0ac transparent;
+  }
+  .back-scroll::-webkit-scrollbar { width: 8px; }
+  .back-scroll::-webkit-scrollbar-thumb { background: #cdc6b2; border-radius: 8px; }
+
+  .answer {
+    font-family: var(--font-serif);
+    font-size: 1.0rem;
+    line-height: 1.5;
+    margin: 0 0 12px;
+  }
+  .answer strong { color: var(--teal-deep); }
+  .answer + .answer { margin-top: 10px; }
+
+  .eq {
+    background: #fff;
+    border: 1px solid var(--paper-2);
+    border-left: 3px solid var(--amber);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 12px 0;
+    overflow-x: auto;
+  }
+  math { font-size: 1.05rem; }
+
+  ul.points { margin: 6px 0 12px; padding-left: 18px; }
+  ul.points li { font-family: var(--font-serif); font-size: 0.98rem; line-height: 1.45; margin-bottom: 5px; }
+  ul.points li strong { color: var(--teal-deep); }
+
+  .diagram { margin: 10px 0 12px; }
+  .diagram svg { width: 100%; height: auto; display: block; }
+
+  .source {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--teal-deep);
+    text-decoration: none;
+    border-top: 1px dashed var(--paper-2);
+    padding-top: 12px;
+    margin-top: 4px;
+  }
+  .source:hover { text-decoration: underline; }
+  .source span.arrow { transition: transform .15s; }
+  .source:hover span.arrow { transform: translate(2px,-2px); }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 22px;
+    border-top: 1px solid var(--panel-line);
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  footer code {
+    font-family: var(--font-mono);
+    color: var(--teal);
+    background: var(--ground-2);
+    padding: 1px 6px;
+    border-radius: 5px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .inner { transition: none; }
+    .reveal .dot { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow"><span class="sig">●</span> Machine Learning · Technical Interview Prep</p>
+    <h1>The AI/ML Interview <em>Deck</em></h1>
+    <p class="lede">A curated study deck of the essential concepts that come up in highly technical AI/ML interviews — spanning ML foundations, probability, deep learning, Transformers &amp; LLMs, and reinforcement learning. Tap any card to flip it: the answer side holds a tight explanation, the key equation or diagram, and a link to the canonical source.</p>
+  </header>
+
+  <div class="toolbar">
+    <div class="chips" id="chips"></div>
+    <div class="count" id="count"></div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <footer>
+    Prototype study deck · <span id="total"></span> cards. Built as a single self-contained page — equations render with native <code>MathML</code>, no external libraries. Extend the deck by adding entries to the <code>CARDS</code> array in the source.
+  </footer>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ *  Flashcard data — each entry generates one flip card.
+ *  cat ∈ { ML Foundations | Probability & Stats | Deep Learning |
+ *          Transformers & LLMs | Reinforcement Learning }
+ *  `body` is HTML; `eq` blocks are native MathML; diagrams are SVG.
+ * ------------------------------------------------------------------ */
+const CARDS = [
+
+  /* ===================== ML FOUNDATIONS ===================== */
+  {
+    cat: "ML Foundations",
+    q: "Derive the bias–variance decomposition. What does each term mean?",
+    body: `
+      <p class="answer">For squared-error loss, the expected test error of an estimator <em>f&#770;</em> at a point decomposes into three additive parts:</p>
+      <div class="eq">
+        <math display="block">
+          <mi>&#x1D53C;</mi><mo>[</mo><msup><mrow><mo>(</mo><mi>y</mi><mo>&#x2212;</mo><mover><mi>f</mi><mo>^</mo></mover><mo>)</mo></mrow><mn>2</mn></msup><mo>]</mo>
+          <mo>=</mo>
+          <msup><mrow><mo>(</mo><mtext>Bias</mtext><mo>)</mo></mrow><mn>2</mn></msup>
+          <mo>+</mo><mtext>Var</mtext><mo>(</mo><mover><mi>f</mi><mo>^</mo></mover><mo>)</mo>
+          <mo>+</mo><msup><mi>&#x03C3;</mi><mn>2</mn></msup>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>Bias²</strong> — error from wrong assumptions; high for too-simple models (underfitting).</li>
+        <li><strong>Variance</strong> — sensitivity to the training sample; high for too-complex models (overfitting).</li>
+        <li><strong>σ²</strong> — irreducible noise; no model can beat it.</li>
+      </ul>
+      <p class="answer">Increasing model capacity lowers bias but raises variance — the classic tradeoff (though deep nets complicate it via <strong>double descent</strong>).</p>`,
+    src: "Hastie, Tibshirani & Friedman — Elements of Statistical Learning (§7.3)",
+    url: "https://hastie.su.domains/ElemStatLearn/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "L1 vs L2 regularization — write both penalties and explain why L1 induces sparsity.",
+    body: `
+      <p class="answer">Both add a norm penalty to the loss to control variance:</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>L</mi><mn>1</mn></msub><mo>:</mo>
+          <mi>L</mi><mo>+</mo><mi>&#x03BB;</mi><munder><mo>&#x2211;</mo><mi>i</mi></munder><mo>|</mo><msub><mi>w</mi><mi>i</mi></msub><mo>|</mo>
+          <mspace width="2em"/>
+          <msub><mi>L</mi><mn>2</mn></msub><mo>:</mo>
+          <mi>L</mi><mo>+</mo><mi>&#x03BB;</mi><munder><mo>&#x2211;</mo><mi>i</mi></munder><msubsup><mi>w</mi><mi>i</mi><mn>2</mn></msubsup>
+        </math>
+      </div>
+      <p class="answer"><strong>L1 (Lasso)</strong> has a constant-magnitude gradient (&#x00B1;&#x03BB;), so it can drive weights exactly to zero &#x2192; <strong>sparse</strong>, feature-selecting solutions; its constraint region has corners on the axes. <strong>L2 (Ridge)</strong> shrinks weights proportionally and smoothly, rarely producing exact zeros. <strong>Elastic Net</strong> combines both.</p>`,
+    src: "Elements of Statistical Learning (§3.4)",
+    url: "https://hastie.su.domains/ElemStatLearn/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Why use cross-entropy rather than MSE to train a classifier?",
+    body: `
+      <p class="answer">Cross-entropy is the negative log-likelihood of the correct class under a softmax/sigmoid output:</p>
+      <div class="eq">
+        <math display="block">
+          <mi>H</mi><mo>=</mo><mo>&#x2212;</mo>
+          <munder><mo>&#x2211;</mo><mi>i</mi></munder>
+          <msub><mi>y</mi><mi>i</mi></msub><mi>log</mi><msub><mover><mi>y</mi><mo>^</mo></mover><mi>i</mi></msub>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Paired with softmax, its gradient is the clean <em>(&#375; &#x2212; y)</em> — no vanishing factor.</li>
+        <li>MSE on a saturated sigmoid gives near-zero gradients &#x2192; slow learning.</li>
+        <li>MSE + classification is non-convex in the logits and penalizes confident-correct predictions oddly.</li>
+      </ul>
+      <p class="answer">Minimizing cross-entropy = maximum likelihood = minimizing KL divergence to the true label distribution.</p>`,
+    src: "Goodfellow, Bengio & Courville — Deep Learning (§6.2)",
+    url: "https://www.deeplearningbook.org/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Precision, recall, F1, ROC-AUC — define them and say when each matters.",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mtext>P</mtext><mo>=</mo><mfrac><mtext>TP</mtext><mrow><mtext>TP</mtext><mo>+</mo><mtext>FP</mtext></mrow></mfrac>
+          <mspace width="1.4em"/>
+          <mtext>R</mtext><mo>=</mo><mfrac><mtext>TP</mtext><mrow><mtext>TP</mtext><mo>+</mo><mtext>FN</mtext></mrow></mfrac>
+          <mspace width="1.4em"/>
+          <msub><mi>F</mi><mn>1</mn></msub><mo>=</mo><mfrac><mrow><mn>2</mn><mtext>PR</mtext></mrow><mrow><mtext>P</mtext><mo>+</mo><mtext>R</mtext></mrow></mfrac>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>Precision</strong> — of predicted positives, how many are right. Optimize when false positives are costly (spam, fraud flags).</li>
+        <li><strong>Recall</strong> — of actual positives, how many you caught. Optimize when misses are costly (cancer screening).</li>
+        <li><strong>F1</strong> — harmonic mean; good single number under class imbalance.</li>
+        <li><strong>ROC-AUC</strong> — ranking quality across all thresholds; use <strong>PR-AUC</strong> instead when positives are rare.</li>
+      </ul>`,
+    src: "scikit-learn — Model evaluation guide",
+    url: "https://scikit-learn.org/stable/modules/model_evaluation.html"
+  },
+
+  /* ===================== PROBABILITY & STATS ===================== */
+  {
+    cat: "Probability & Stats",
+    q: "MLE vs MAP — write both objectives. When do they coincide?",
+    body: `
+      <p class="answer"><strong>MLE</strong> maximizes the data likelihood; <strong>MAP</strong> adds a log-prior, making it the Bayesian point estimate of the posterior mode:</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>&#x03B8;</mi><mtext>MLE</mtext></msub><mo>=</mo><munder><mi>argmax</mi><mi>&#x03B8;</mi></munder><mi>log</mi><mi>p</mi><mo>(</mo><mi>D</mi><mo>&#x2223;</mo><mi>&#x03B8;</mi><mo>)</mo>
+        </math>
+        <math display="block">
+          <msub><mi>&#x03B8;</mi><mtext>MAP</mtext></msub><mo>=</mo><munder><mi>argmax</mi><mi>&#x03B8;</mi></munder><mo>[</mo><mi>log</mi><mi>p</mi><mo>(</mo><mi>D</mi><mo>&#x2223;</mo><mi>&#x03B8;</mi><mo>)</mo><mo>+</mo><mi>log</mi><mi>p</mi><mo>(</mo><mi>&#x03B8;</mi><mo>)</mo><mo>]</mo>
+        </math>
+      </div>
+      <p class="answer">A Gaussian prior &#x2192; L2 regularization; a Laplace prior &#x2192; L1. They <strong>coincide</strong> with a uniform (flat) prior, or asymptotically as data &#x2192; &#x221E; (the likelihood dominates the prior).</p>`,
+    src: "Bishop — Pattern Recognition and Machine Learning (§1.2, §3.1)",
+    url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "State Bayes' theorem and contrast generative vs discriminative models.",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mi>p</mi><mo>(</mo><mi>&#x03B8;</mi><mo>&#x2223;</mo><mi>D</mi><mo>)</mo><mo>=</mo>
+          <mfrac>
+            <mrow><mi>p</mi><mo>(</mo><mi>D</mi><mo>&#x2223;</mo><mi>&#x03B8;</mi><mo>)</mo><mspace width="0.15em"/><mi>p</mi><mo>(</mo><mi>&#x03B8;</mi><mo>)</mo></mrow>
+            <mrow><mi>p</mi><mo>(</mo><mi>D</mi><mo>)</mo></mrow>
+          </mfrac>
+        </math>
+      </div>
+      <p class="answer">posterior &#x221D; likelihood &#x00D7; prior. The denominator (evidence) normalizes over all hypotheses.</p>
+      <ul class="points">
+        <li><strong>Generative</strong> models the joint <em>p(x, y)</em> (or <em>p(x|y)p(y)</em>) and uses Bayes to classify — e.g. Naive Bayes, GMMs, LLMs. Can sample new data.</li>
+        <li><strong>Discriminative</strong> models <em>p(y|x)</em> directly — e.g. logistic regression, most classifiers. Usually better accuracy with enough data.</li>
+      </ul>`,
+    src: "Ng & Jordan — On Discriminative vs Generative Classifiers (NeurIPS 2001)",
+    url: "https://ai.stanford.edu/~ang/papers/nips01-discriminativegenerative.pdf"
+  },
+
+  /* ===================== DEEP LEARNING ===================== */
+  {
+    cat: "Deep Learning",
+    q: "Explain backpropagation. What is it actually computing?",
+    body: `
+      <p class="answer"><strong>Backprop</strong> is reverse-mode automatic differentiation applied to a neural net: it computes the gradient of the loss w.r.t. every parameter by applying the <strong>chain rule</strong> backward through the computation graph.</p>
+      <div class="eq">
+        <math display="block">
+          <mfrac><mrow><mo>&#x2202;</mo><mi>L</mi></mrow><mrow><mo>&#x2202;</mo><msup><mi>W</mi><mrow><mo>(</mo><mi>l</mi><mo>)</mo></mrow></msup></mrow></mfrac>
+          <mo>=</mo>
+          <msup><mi>&#x03B4;</mi><mrow><mo>(</mo><mi>l</mi><mo>)</mo></mrow></msup>
+          <msup><mrow><mo>(</mo><msup><mi>a</mi><mrow><mo>(</mo><mi>l</mi><mo>&#x2212;</mo><mn>1</mn><mo>)</mo></mrow></msup><mo>)</mo></mrow><mo>&#x22A4;</mo></msup>
+          <mo>,</mo><mspace width="1em"/>
+          <msup><mi>&#x03B4;</mi><mrow><mo>(</mo><mi>l</mi><mo>)</mo></mrow></msup><mo>=</mo>
+          <mrow><mo>(</mo><msup><mi>W</mi><mrow><mo>(</mo><mi>l</mi><mo>+</mo><mn>1</mn><mo>)</mo></mrow></msup><mo>)</mo></mrow><mo>&#x22A4;</mo>
+          <msup><mi>&#x03B4;</mi><mrow><mo>(</mo><mi>l</mi><mo>+</mo><mn>1</mn><mo>)</mo></mrow></msup>
+          <mo>&#x2299;</mo>
+          <msup><mi>&#x03C3;</mi><mo>&#x2032;</mo></msup>
+          <mo>(</mo><msup><mi>z</mi><mrow><mo>(</mo><mi>l</mi><mo>)</mo></mrow></msup><mo>)</mo>
+        </math>
+      </div>
+      <p class="answer">It reuses cached forward activations, computing all gradients in one backward pass — <em>O(network size)</em>, not the exponential cost of naive per-parameter differentiation.</p>`,
+    src: "Deep Learning Book (§6.5) · Rumelhart, Hinton & Williams (1986)",
+    url: "https://www.deeplearningbook.org/contents/mlp.html"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What causes vanishing/exploding gradients, and how do modern nets fix it?",
+    body: `
+      <p class="answer">In deep nets the gradient is a long product of Jacobians; if their singular values are consistently &lt;1 it <strong>vanishes</strong>, if &gt;1 it <strong>explodes</strong> — early layers stop learning or diverge.</p>
+      <ul class="points">
+        <li><strong>ReLU / GELU</strong> activations — no saturating gradient like sigmoid/tanh.</li>
+        <li><strong>Residual connections</strong> — identity shortcuts give gradients a direct path (the key to training 100+ layers).</li>
+        <li><strong>Normalization</strong> (Batch/Layer norm) — keeps activation scales stable.</li>
+        <li><strong>Careful init</strong> (Xavier/He) and <strong>gradient clipping</strong> for the exploding case (esp. RNNs).</li>
+      </ul>`,
+    src: "He et al. — Deep Residual Learning (ResNet, 2015)",
+    url: "https://arxiv.org/abs/1512.03385"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What does Batch Normalization compute, and why does it help?",
+    body: `
+      <p class="answer">BN normalizes each feature over the mini-batch, then applies a learnable scale &amp; shift:</p>
+      <div class="eq">
+        <math display="block">
+          <mover><mi>x</mi><mo>^</mo></mover><mo>=</mo>
+          <mfrac><mrow><mi>x</mi><mo>&#x2212;</mo><msub><mi>&#x03BC;</mi><mi>B</mi></msub></mrow>
+                 <msqrt><mrow><msubsup><mi>&#x03C3;</mi><mi>B</mi><mn>2</mn></msubsup><mo>+</mo><mi>&#x03B5;</mi></mrow></msqrt></mfrac>
+          <mo>,</mo><mspace width="1em"/>
+          <mi>y</mi><mo>=</mo><mi>&#x03B3;</mi><mover><mi>x</mi><mo>^</mo></mover><mo>+</mo><mi>&#x03B2;</mi>
+        </math>
+      </div>
+      <p class="answer">It smooths the optimization landscape (the dominant modern explanation, vs. the original "internal covariate shift" story), allowing higher learning rates and acting as a mild regularizer. Note: it couples examples in a batch, so it behaves differently at train vs. inference (running stats) — which is why Transformers prefer <strong>LayerNorm</strong>.</p>`,
+    src: "Ioffe & Szegedy — Batch Normalization (2015)",
+    url: "https://arxiv.org/abs/1502.03167"
+  },
+  {
+    cat: "Deep Learning",
+    q: "Write the Adam update. Why momentum and why the second moment?",
+    body: `
+      <p class="answer">Adam keeps running estimates of the gradient's first moment (mean) and second moment (uncentered variance):</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>m</mi><mi>t</mi></msub><mo>=</mo><msub><mi>&#x03B2;</mi><mn>1</mn></msub><msub><mi>m</mi><mrow><mi>t</mi><mo>&#x2212;</mo><mn>1</mn></mrow></msub><mo>+</mo><mo>(</mo><mn>1</mn><mo>&#x2212;</mo><msub><mi>&#x03B2;</mi><mn>1</mn></msub><mo>)</mo><msub><mi>g</mi><mi>t</mi></msub>
+        </math>
+        <math display="block">
+          <msub><mi>v</mi><mi>t</mi></msub><mo>=</mo><msub><mi>&#x03B2;</mi><mn>2</mn></msub><msub><mi>v</mi><mrow><mi>t</mi><mo>&#x2212;</mo><mn>1</mn></mrow></msub><mo>+</mo><mo>(</mo><mn>1</mn><mo>&#x2212;</mo><msub><mi>&#x03B2;</mi><mn>2</mn></msub><mo>)</mo><msubsup><mi>g</mi><mi>t</mi><mn>2</mn></msubsup>
+        </math>
+        <math display="block">
+          <msub><mi>&#x03B8;</mi><mi>t</mi></msub><mo>=</mo><msub><mi>&#x03B8;</mi><mrow><mi>t</mi><mo>&#x2212;</mo><mn>1</mn></mrow></msub><mo>&#x2212;</mo><mi>&#x03B1;</mi>
+          <mfrac><msub><mover><mi>m</mi><mo>^</mo></mover><mi>t</mi></msub><mrow><msqrt><msub><mover><mi>v</mi><mo>^</mo></mover><mi>t</mi></msub></msqrt><mo>+</mo><mi>&#x03B5;</mi></mrow></mfrac>
+        </math>
+      </div>
+      <p class="answer"><strong>Momentum</strong> (<em>m</em>) smooths noisy gradients; the <strong>second moment</strong> (<em>v</em>) gives per-parameter adaptive step sizes — large for rarely-updated params, small for high-variance ones. Hats denote bias correction. <strong>AdamW</strong> decouples weight decay and is the LLM default.</p>`,
+    src: "Kingma & Ba — Adam (2015)",
+    url: "https://arxiv.org/abs/1412.6980"
+  },
+  {
+    cat: "Deep Learning",
+    q: "How does dropout regularize a network, and what changes at inference?",
+    body: `
+      <p class="answer"><strong>Dropout</strong> randomly zeros each unit with probability <em>p</em> during training, so the network can't rely on specific co-adapted neurons — it implicitly trains an ensemble of subnetworks sharing weights.</p>
+      <ul class="points">
+        <li>At <strong>inference</strong> all units are kept; activations are scaled by <em>(1&#x2212;p)</em> (or equivalently scaled up by <em>1/(1&#x2212;p)</em> at train time — "inverted dropout") so expected magnitudes match.</li>
+        <li>Acts like training an exponential ensemble and averaging it cheaply.</li>
+        <li>Less common in modern Transformers, which lean on large data + LayerNorm + weight decay, though still used in attention/residual paths.</li>
+      </ul>`,
+    src: "Srivastava et al. — Dropout (JMLR 2014)",
+    url: "https://jmlr.org/papers/v15/srivastava14a.html"
+  },
+
+  /* ===================== TRANSFORMERS & LLMs ===================== */
+  {
+    cat: "Transformers & LLMs",
+    q: "Write scaled dot-product attention. Why divide by √dₖ?",
+    body: `
+      <p class="answer">Attention computes a weighted average of value vectors, where weights come from query–key similarity:</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>Attn</mtext><mo>(</mo><mi>Q</mi><mo>,</mo><mi>K</mi><mo>,</mo><mi>V</mi><mo>)</mo><mo>=</mo>
+          <mtext>softmax</mtext>
+          <mo>(</mo>
+          <mfrac><mrow><mi>Q</mi><msup><mi>K</mi><mo>&#x22A4;</mo></msup></mrow><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt></mfrac>
+          <mo>)</mo>
+          <mi>V</mi>
+        </math>
+      </div>
+      <p class="answer">For <em>d<sub>k</sub></em>-dim random Q,K with unit-variance entries, the dot product has variance <em>d<sub>k</sub></em>. Without the <strong>1/&#x221A;d<sub>k</sub></strong> scaling, large magnitudes push softmax into saturated regions where gradients vanish. The scaling keeps logits at unit variance, stabilizing training.</p>`,
+    src: "Vaswani et al. — Attention Is All You Need (2017)",
+    url: "https://arxiv.org/abs/1706.03762"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "Why multi-head attention instead of one big attention?",
+    body: `
+      <p class="answer">Multi-head attention runs <em>h</em> attention operations in parallel on learned <em>d/h</em>-dim projections of Q,K,V, then concatenates:</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>MHA</mtext><mo>=</mo><mtext>Concat</mtext><mo>(</mo><msub><mtext>head</mtext><mn>1</mn></msub><mo>,</mo><mo>&#x2026;</mo><mo>,</mo><msub><mtext>head</mtext><mi>h</mi></msub><mo>)</mo><msup><mi>W</mi><mi>O</mi></msup>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Each head can attend to a <strong>different subspace/relationship</strong> — syntax, position, coreference — at the same layer.</li>
+        <li>A single softmax can only place one "spotlight"; multiple heads capture multiple alignment patterns per token.</li>
+        <li>Same total compute as one full-width head, but far more expressive.</li>
+      </ul>`,
+    src: "Vaswani et al. — Attention Is All You Need (§3.2.2)",
+    url: "https://arxiv.org/abs/1706.03762"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "Why do Transformers need positional encodings? What is RoPE?",
+    body: `
+      <p class="answer">Self-attention is <strong>permutation-equivariant</strong> — it has no inherent notion of order — so position must be injected. The original Transformer added fixed <strong>sinusoidal</strong> encodings of varying frequency.</p>
+      <ul class="points">
+        <li><strong>RoPE (Rotary)</strong> rotates the query/key vectors by an angle proportional to position, so the dot product depends only on <strong>relative</strong> distance <em>(m&#x2212;n)</em>.</li>
+        <li>Gives better length extrapolation and is the default in LLaMA, GPT-NeoX, Qwen, etc.</li>
+        <li>Alternatives: learned absolute embeddings (BERT/GPT-2), ALiBi (additive distance bias).</li>
+      </ul>`,
+    src: "Su et al. — RoFormer / RoPE (2021)",
+    url: "https://arxiv.org/abs/2104.09864"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is the KV cache, and why is it essential for LLM inference?",
+    body: `
+      <p class="answer">During autoregressive generation, each new token attends to <em>all</em> previous tokens. Recomputing keys and values for the whole prefix at every step is <em>O(n²)</em> wasted work.</p>
+      <ul class="points">
+        <li>The <strong>KV cache</strong> stores the K and V projections of past tokens, so each step only computes K,V for the <strong>one</strong> new token &#x2192; per-step cost drops to <em>O(n)</em>.</li>
+        <li>Cost: memory grows linearly with sequence length &#x00D7; layers &#x00D7; heads — often the real bottleneck for long context.</li>
+        <li>Optimizations: <strong>MQA/GQA</strong> (share K,V across heads), <strong>PagedAttention</strong> (vLLM) for memory efficiency.</li>
+      </ul>`,
+    src: "Pope et al. — Efficiently Scaling Transformer Inference (2022)",
+    url: "https://arxiv.org/abs/2211.05102"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "Compare decoding strategies: greedy, beam, temperature, top-k, top-p.",
+    body: `
+      <p class="answer">Logits are turned into a distribution via softmax with <strong>temperature T</strong> — <em>T&lt;1</em> sharpens (more deterministic), <em>T&gt;1</em> flattens (more diverse):</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>p</mi><mi>i</mi></msub><mo>=</mo>
+          <mfrac>
+            <msup><mi>e</mi><mrow><msub><mi>z</mi><mi>i</mi></msub><mo>/</mo><mi>T</mi></mrow></msup>
+            <mrow><munder><mo>&#x2211;</mo><mi>j</mi></munder><msup><mi>e</mi><mrow><msub><mi>z</mi><mi>j</mi></msub><mo>/</mo><mi>T</mi></mrow></msup></mrow>
+          </mfrac>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>Greedy / beam</strong> — pick argmax / keep top-B sequences. Best for closed-ended tasks; bland or repetitive for open text.</li>
+        <li><strong>Top-k</strong> — sample from the k highest-prob tokens.</li>
+        <li><strong>Top-p (nucleus)</strong> — sample from the smallest set whose cumulative prob &#x2265; p; adapts to how peaked the distribution is.</li>
+      </ul>`,
+    src: "Holtzman et al. — The Curious Case of Neural Text Degeneration (2020)",
+    url: "https://arxiv.org/abs/1904.09751"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "Walk through the RLHF pipeline used to align LLMs.",
+    body: `
+      <ul class="points">
+        <li><strong>1 · SFT</strong> — supervised fine-tune the base model on high-quality human demonstrations.</li>
+        <li><strong>2 · Reward model</strong> — collect human <em>preference</em> comparisons between outputs; train a model to predict which response humans prefer (Bradley–Terry loss).</li>
+        <li><strong>3 · RL optimization</strong> — fine-tune the policy with <strong>PPO</strong> to maximize the reward, with a <strong>KL penalty</strong> to the SFT model so it doesn't drift / reward-hack.</li>
+      </ul>
+      <div class="eq">
+        <math display="block">
+          <mtext>objective</mtext><mo>=</mo>
+          <msub><mi>&#x1D53C;</mi><mrow><mi>x</mi><mo>&#x223C;</mo><mi>&#x03C0;</mi></mrow></msub><mo>[</mo><mi>r</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>]</mo>
+          <mo>&#x2212;</mo><mi>&#x03B2;</mi><mspace width="0.2em"/><mtext>KL</mtext><mo>(</mo><mi>&#x03C0;</mi><mo>&#x2225;</mo><msub><mi>&#x03C0;</mi><mtext>SFT</mtext></msub><mo>)</mo>
+        </math>
+      </div>
+      <p class="answer">Newer variants like <strong>DPO</strong> skip the explicit reward model and optimize preferences directly.</p>`,
+    src: "Ouyang et al. — InstructGPT (2022)",
+    url: "https://arxiv.org/abs/2203.02155"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is LoRA, and why does it make fine-tuning cheap?",
+    body: `
+      <p class="answer"><strong>LoRA</strong> freezes the pretrained weights <em>W&#x2080;</em> and learns a low-rank update, exploiting the fact that the fine-tuning delta has low intrinsic rank:</p>
+      <div class="eq">
+        <math display="block">
+          <mi>W</mi><mo>=</mo><msub><mi>W</mi><mn>0</mn></msub><mo>+</mo><mi>&#x0394;</mi><mi>W</mi><mo>=</mo>
+          <msub><mi>W</mi><mn>0</mn></msub><mo>+</mo><mi>B</mi><mi>A</mi><mo>,</mo>
+          <mspace width="1em"/>
+          <mi>B</mi><mo>&#x2208;</mo><msup><mi>&#x211D;</mi><mrow><mi>d</mi><mo>&#x00D7;</mo><mi>r</mi></mrow></msup><mo>,</mo>
+          <mi>A</mi><mo>&#x2208;</mo><msup><mi>&#x211D;</mi><mrow><mi>r</mi><mo>&#x00D7;</mo><mi>k</mi></mrow></msup><mo>,</mo>
+          <mi>r</mi><mo>&#x226A;</mo><mi>d</mi>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Trains only <em>r(d+k)</em> params instead of <em>dk</em> — often &lt;1% of the model.</li>
+        <li>Huge memory savings (no optimizer states for frozen weights); adapters are swappable.</li>
+        <li><strong>QLoRA</strong> adds 4-bit quantization of the frozen base to fit on a single GPU.</li>
+      </ul>`,
+    src: "Hu et al. — LoRA (2021)",
+    url: "https://arxiv.org/abs/2106.09685"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What do scaling laws / Chinchilla tell us about compute-optimal training?",
+    body: `
+      <p class="answer">Test loss falls as a smooth <strong>power law</strong> in model size <em>N</em>, data <em>D</em>, and compute <em>C</em>:</p>
+      <div class="eq">
+        <math display="block">
+          <mi>L</mi><mo>(</mo><mi>N</mi><mo>,</mo><mi>D</mi><mo>)</mo><mo>&#x2248;</mo>
+          <mi>E</mi><mo>+</mo>
+          <mfrac><mi>A</mi><msup><mi>N</mi><mi>&#x03B1;</mi></msup></mfrac>
+          <mo>+</mo>
+          <mfrac><mi>B</mi><msup><mi>D</mi><mi>&#x03B2;</mi></msup></mfrac>
+        </math>
+      </div>
+      <p class="answer">The <strong>Chinchilla</strong> result: for a fixed compute budget, <em>N</em> and <em>D</em> should scale roughly <strong>equally</strong> (≈ 20 tokens per parameter). Earlier models like GPT-3 were badly <em>under-trained</em> — too big for their data. This reframed the field toward smaller models on far more tokens.</p>`,
+    src: "Hoffmann et al. — Training Compute-Optimal LLMs (Chinchilla, 2022)",
+    url: "https://arxiv.org/abs/2203.15556"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is perplexity, and how does it relate to cross-entropy loss?",
+    body: `
+      <p class="answer"><strong>Perplexity</strong> is the exponential of the per-token cross-entropy — intuitively, the model's average branching factor (how many equally-likely tokens it's choosing among):</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>PPL</mtext><mo>=</mo>
+          <mi>exp</mi><mo>(</mo>
+          <mo>&#x2212;</mo><mfrac><mn>1</mn><mi>N</mi></mfrac>
+          <munderover><mo>&#x2211;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover>
+          <mi>log</mi><mi>p</mi><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>&#x2223;</mo><msub><mi>x</mi><mrow><mo>&lt;</mo><mi>i</mi></mrow></msub><mo>)</mo>
+          <mo>)</mo><mo>=</mo><msup><mi>e</mi><mtext>CE</mtext></msup>
+        </math>
+      </div>
+      <p class="answer">Lower is better. PPL = 1 means perfect prediction; PPL = vocab size means uniform guessing. It depends on the tokenizer, so it's only comparable across models with the <strong>same tokenization</strong>.</p>`,
+    src: "Jurafsky & Martin — Speech and Language Processing (Ch. 3)",
+    url: "https://web.stanford.edu/~jurafsky/slp3/"
+  },
+
+  /* ===================== REINFORCEMENT LEARNING ===================== */
+  {
+    cat: "Reinforcement Learning",
+    q: "What is a Markov Decision Process and the agent–environment loop?",
+    body: `
+      <p class="answer">An <strong>MDP</strong> is the formal model of sequential decision-making: the tuple
+      &#x27E8;&#x1D4AE;, &#x1D49C;, P, R, &#x03B3;&#x27E9; — states, actions, transition dynamics, reward, discount.</p>
+      <p class="answer">The agent observes <em>S<sub>t</sub></em>, takes <em>A<sub>t</sub></em>, and the environment returns <em>R<sub>t+1</sub></em> and <em>S<sub>t+1</sub></em>. The <strong>Markov property</strong>: the future depends only on the present state, not the full history.</p>
+      <div class="diagram">
+        <svg viewBox="0 0 320 130" role="img" aria-label="Agent-environment interaction loop">
+          <rect x="20" y="20" width="110" height="44" rx="8" fill="#15233E" stroke="#37C2A8"/>
+          <text x="75" y="47" fill="#E8EEF6" font-size="15" font-family="Segoe UI, sans-serif" text-anchor="middle">Agent</text>
+          <rect x="190" y="20" width="110" height="44" rx="8" fill="#15233E" stroke="#F4A63B"/>
+          <text x="245" y="47" fill="#E8EEF6" font-size="14" font-family="Segoe UI, sans-serif" text-anchor="middle">Environment</text>
+          <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4A5566"/></marker></defs>
+          <path d="M130,34 H190" stroke="#F4A63B" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+          <text x="160" y="26" fill="#F4A63B" font-size="12" font-family="Cascadia Code, monospace" text-anchor="middle">A&#8348;</text>
+          <path d="M190,52 H130" stroke="#37C2A8" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+          <text x="160" y="68" fill="#37C2A8" font-size="11" font-family="Cascadia Code, monospace" text-anchor="middle">S&#8348;&#8330;&#8321;, R&#8348;&#8330;&#8321;</text>
+          <text x="160" y="108" fill="#7E8DA3" font-size="11" font-family="Cascadia Code, monospace" text-anchor="middle">act &#8594; observe &#8594; reward &#8594; repeat</text>
+        </svg>
+      </div>`,
+    src: "Sutton & Barto — RL: An Introduction (Ch. 3)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "Write the Bellman expectation equation for Vᵖ and explain it.",
+    body: `
+      <p class="answer">A <strong>consistency condition</strong>: the value of a state = expected immediate reward + discounted value of the next state.</p>
+      <div class="eq">
+        <math display="block">
+          <msup><mi>V</mi><mi>&#x03C0;</mi></msup><mo>(</mo><mi>s</mi><mo>)</mo><mo>=</mo>
+          <munder><mo>&#x2211;</mo><mi>a</mi></munder><mi>&#x03C0;</mi><mo>(</mo><mi>a</mi><mo>&#x2223;</mo><mi>s</mi><mo>)</mo>
+          <munder><mo>&#x2211;</mo><mrow><msup><mi>s</mi><mo>&#x2032;</mo></msup><mo>,</mo><mi>r</mi></mrow></munder>
+          <mi>p</mi><mo>(</mo><msup><mi>s</mi><mo>&#x2032;</mo></msup><mo>,</mo><mi>r</mi><mo>&#x2223;</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo>
+          <mo>[</mo><mi>r</mi><mo>+</mo><mi>&#x03B3;</mi>
+          <msup><mi>V</mi><mi>&#x03C0;</mi></msup><mo>(</mo><msup><mi>s</mi><mo>&#x2032;</mo></msup><mo>)</mo><mo>]</mo>
+        </math>
+      </div>
+      <p class="answer">This recursion underpins dynamic programming and TD learning. The <strong>optimality</strong> version replaces the policy average with a <em>max</em> over actions and yields <em>V*</em>.</p>`,
+    src: "Sutton & Barto — RL: An Introduction (§3.5–3.6)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "Write the Q-learning update. Why is it off-policy?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mi>Q</mi><mo>(</mo><mi>S</mi><mo>,</mo><mi>A</mi><mo>)</mo><mo>&#x2190;</mo>
+          <mi>Q</mi><mo>(</mo><mi>S</mi><mo>,</mo><mi>A</mi><mo>)</mo><mo>+</mo><mi>&#x03B1;</mi>
+          <mo>[</mo><mi>R</mi><mo>+</mo><mi>&#x03B3;</mi>
+          <munder><mi>max</mi><msup><mi>a</mi><mo>&#x2032;</mo></msup></munder>
+          <mi>Q</mi><mo>(</mo><msup><mi>S</mi><mo>&#x2032;</mo></msup><mo>,</mo><msup><mi>a</mi><mo>&#x2032;</mo></msup><mo>)</mo>
+          <mo>&#x2212;</mo><mi>Q</mi><mo>(</mo><mi>S</mi><mo>,</mo><mi>A</mi><mo>)</mo><mo>]</mo>
+        </math>
+      </div>
+      <p class="answer">It directly learns the optimal <em>Q*</em>. It is <strong>off-policy</strong> because the TD target uses the greedy <em>max</em> action — the target policy — regardless of the exploratory action the behavior policy actually took. This is what lets DQN learn from a replay buffer of old, off-policy experience.</p>`,
+    src: "Sutton & Barto — RL: An Introduction (§6.5)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is the policy gradient theorem (REINFORCE)?",
+    body: `
+      <p class="answer">Policy-gradient methods optimize a parameterized policy &#x03C0;<sub>&#x03B8;</sub> directly by ascending the gradient of expected return:</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>&#x2207;</mi><mi>&#x03B8;</mi></msub><mi>J</mi><mo>(</mo><mi>&#x03B8;</mi><mo>)</mo><mo>=</mo>
+          <msub><mi>&#x1D53C;</mi><mi>&#x03C0;</mi></msub>
+          <mo>[</mo>
+          <msub><mi>&#x2207;</mi><mi>&#x03B8;</mi></msub><mi>log</mi>
+          <msub><mi>&#x03C0;</mi><mi>&#x03B8;</mi></msub><mo>(</mo><mi>a</mi><mo>&#x2223;</mo><mi>s</mi><mo>)</mo>
+          <mspace width="0.2em"/>
+          <msub><mi>A</mi><mi>t</mi></msub>
+          <mo>]</mo>
+        </math>
+      </div>
+      <p class="answer">Push up the log-probability of actions weighted by how good they were. Using the return <em>G<sub>t</sub></em> gives <strong>REINFORCE</strong>; using the <strong>advantage</strong> <em>A=Q&#x2212;V</em> with a learned critic gives <strong>actor–critic</strong> and sharply lowers variance. This is the same machinery RLHF uses to align LLMs.</p>`,
+    src: "OpenAI Spinning Up — Intro to Policy Optimization",
+    url: "https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is PPO's clipped objective, and why clip?",
+    body: `
+      <p class="answer"><strong>PPO</strong> maximizes a surrogate in terms of the probability ratio <em>r<sub>t</sub>(&#x03B8;)=&#x03C0;<sub>&#x03B8;</sub>/&#x03C0;<sub>old</sub></em>, clipped so one update can't move the policy too far:</p>
+      <div class="eq">
+        <math display="block">
+          <msup><mi>L</mi><mtext>CLIP</mtext></msup><mo>=</mo>
+          <msub><mi>&#x1D53C;</mi><mi>t</mi></msub><mo>[</mo>
+          <mi>min</mi><mo>(</mo>
+          <msub><mi>r</mi><mi>t</mi></msub><msub><mover><mi>A</mi><mo>^</mo></mover><mi>t</mi></msub><mo>,</mo>
+          <mi>clip</mi><mo>(</mo><msub><mi>r</mi><mi>t</mi></msub><mo>,</mo><mn>1</mn><mo>&#x2212;</mo><mi>&#x03B5;</mi><mo>,</mo><mn>1</mn><mo>+</mo><mi>&#x03B5;</mi><mo>)</mo>
+          <msub><mover><mi>A</mi><mo>^</mo></mover><mi>t</mi></msub>
+          <mo>)</mo><mo>]</mo>
+        </math>
+      </div>
+      <p class="answer">The <em>min</em> of clipped and unclipped terms is a pessimistic lower bound, giving TRPO-like stability with simple first-order optimization. Typically &#x03B5; &#x2248; 0.2. It's the workhorse RL algorithm behind RLHF.</p>`,
+    src: "Schulman et al. — Proximal Policy Optimization (2017)",
+    url: "https://arxiv.org/abs/1707.06347"
+  }
+];
+
+/* ------------------------------------------------------------------ */
+const catClass = {
+  "ML Foundations":        "",      /* amber (default) */
+  "Probability & Stats":   "stats", /* blue */
+  "Deep Learning":         "dl",    /* teal */
+  "Transformers & LLMs":   "llm",   /* purple */
+  "Reinforcement Learning":"rl"     /* salmon */
+};
+/* category display order for the filter chips */
+const CAT_ORDER = ["ML Foundations","Probability & Stats","Deep Learning","Transformers & LLMs","Reinforcement Learning"];
+
+const grid    = document.getElementById("grid");
+const chips   = document.getElementById("chips");
+const countEl = document.getElementById("count");
+document.getElementById("total").textContent = CARDS.length;
+
+let active = "All";
+
+function buildChips() {
+  const present = CAT_ORDER.filter(c => CARDS.some(card => card.cat === c));
+  const cats = ["All", ...present];
+  chips.innerHTML = "";
+  cats.forEach(cat => {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = cat;
+    b.setAttribute("aria-pressed", cat === active);
+    b.addEventListener("click", () => { active = cat; render(); });
+    chips.appendChild(b);
+  });
+}
+
+function render() {
+  buildChips();
+  grid.innerHTML = "";
+  const list = CARDS.filter(c => active === "All" || c.cat === active);
+  list.forEach(c => grid.appendChild(makeCard(c)));
+  countEl.innerHTML = `Showing <b>${list.length}</b> / ${CARDS.length} cards`;
+}
+
+function makeCard(c) {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.setAttribute("role", "button");
+  card.setAttribute("tabindex", "0");
+  card.setAttribute("aria-label", "Flashcard: " + c.q + ". Activate to reveal answer.");
+
+  const cls = catClass[c.cat] || "";
+  card.innerHTML = `
+    <div class="inner">
+      <div class="face front">
+        <span class="tag ${cls}">${c.cat}</span>
+        <p class="q">${c.q}</p>
+        <span class="reveal"><span class="dot"></span> Tap to reveal answer</span>
+      </div>
+      <div class="face back">
+        <div class="back-head">
+          <span class="lbl">Answer · ${c.cat}</span>
+          <button class="flip-back" type="button" aria-label="Flip back to question">&#8634; Question</button>
+        </div>
+        <div class="back-scroll">
+          ${c.body}
+          <a class="source" href="${c.url}" target="_blank" rel="noopener">
+            &#128279; ${c.src} <span class="arrow">&#8599;</span>
+          </a>
+        </div>
+      </div>
+    </div>`;
+
+  const flip = (state) => {
+    card.classList.toggle("flipped", state);
+    card.setAttribute("aria-pressed", state);
+  };
+
+  card.querySelector(".front").addEventListener("click", () => flip(true));
+  card.querySelector(".flip-back").addEventListener("click", (e) => { e.stopPropagation(); flip(false); });
+  card.querySelector(".back-scroll").addEventListener("click", (e) => e.stopPropagation());
+  card.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      flip(!card.classList.contains("flipped"));
+    }
+  });
+
+  return card;
+}
+
+render();
+</script>
+
+<script>
+  /* Register the service worker so the deck is installable and works offline. */
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function (err) {
+        console.warn("Service worker registration failed:", err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
