@@ -770,6 +770,364 @@ const CARDS = [
     src: "Jurafsky & Martin — Speech and Language Processing (Ch. 3)",
     url: "https://web.stanford.edu/~jurafsky/slp3/"
   },
+  {
+    cat: "Transformers & LLMs",
+    q: "Compare encoder-only, decoder-only, and encoder-decoder Transformer architectures. When do you use each?",
+    body: `
+      <ul class="points">
+        <li><strong>Encoder-only</strong> (BERT, RoBERTa) — bidirectional attention, masked-LM objective. Best for classification, retrieval embeddings, extractive QA. No generation.</li>
+        <li><strong>Decoder-only</strong> (GPT, LLaMA, PaLM) — causal attention, next-token prediction. General-purpose generation and, empirically, the winner for scaling.</li>
+        <li><strong>Encoder-decoder</strong> (T5, BART, original Transformer) — bidirectional encoder + causal decoder with cross-attention. Strong at conditional generation (translation, summarization) when input and output are clearly separated.</li>
+      </ul>
+      <p class="answer">The field converged on <strong>decoder-only</strong> for foundation LLMs — one autoregressive loss, works for any task via prompting, and scales predictably. Encoder-only lives on for embeddings; encoder-decoder lives on for specialist conditional-generation tasks.</p>`,
+    src: "Vaswani et al. — Attention Is All You Need; Radford et al. — GPT / GPT-2",
+    url: "https://arxiv.org/abs/1706.03762"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is causal masking, and why does it enable autoregressive training in a single parallel pass?",
+    body: `
+      <p class="answer">A <strong>causal mask</strong> is a triangular pattern added to the pre-softmax attention scores that sets score[i, j] = &minus;&infin; for all j &gt; i. After softmax, token <em>i</em> can only attend to positions &le; <em>i</em>.</p>
+      <ul class="points">
+        <li>Turns bidirectional self-attention into an autoregressive next-token model.</li>
+        <li>Enables <strong>teacher-forcing in parallel</strong>: because no position can leak information from the future, the loss over N next-token targets is computed in a single forward pass.</li>
+        <li>This parallelism is what makes Transformers train orders of magnitude faster than RNNs on long sequences — every position gradient contributes simultaneously.</li>
+      </ul>`,
+    src: "Vaswani et al. — Attention Is All You Need (§3.2.3)",
+    url: "https://arxiv.org/abs/1706.03762"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "Why do Transformers use LayerNorm rather than BatchNorm, and what's the pre-norm vs post-norm trade-off?",
+    body: `
+      <p class="answer"><strong>LayerNorm</strong> normalizes across the feature dimension for each token independently, so it doesn't couple examples in a batch — critical for variable-length sequences and tiny inference batches. BatchNorm's running stats also misbehave for autoregressive generation.</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>LN</mtext><mo>(</mo><mi>x</mi><mo>)</mo>
+          <mo>=</mo>
+          <mi>&#x03B3;</mi>
+          <mo>&#x22C5;</mo>
+          <mfrac>
+            <mrow><mi>x</mi><mo>&#x2212;</mo><mi>&#x03BC;</mi></mrow>
+            <msqrt><mrow><msup><mi>&#x03C3;</mi><mn>2</mn></msup><mo>+</mo><mi>&#x03B5;</mi></mrow></msqrt>
+          </mfrac>
+          <mo>+</mo><mi>&#x03B2;</mi>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>Post-norm</strong> (original Transformer): x + Sublayer(x) &rarr; LN. Hard to train deep; needs long warmup.</li>
+        <li><strong>Pre-norm</strong> (GPT-2 onward): LN(x) &rarr; Sublayer &rarr; residual. Stable at hundreds of layers, standard in modern LLMs. Slightly lower final quality per parameter, but the training stability wins at scale.</li>
+      </ul>`,
+    src: "Ba et al. — Layer Normalization; Xiong et al. — On Layer Normalization in the Transformer Architecture",
+    url: "https://arxiv.org/abs/2002.04745"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "Why are residual connections critical in Transformers? What breaks without them?",
+    body: `
+      <p class="answer">Every sublayer output is added back to its input: <em>y = x + Sublayer(x)</em>. This creates an <strong>identity path</strong> from input to output through the entire network.</p>
+      <ul class="points">
+        <li><strong>Gradient flow</strong> &mdash; the identity path guarantees &part;y/&part;x has a term of 1, so gradients don't vanish through hundreds of layers.</li>
+        <li><strong>Residual-stream view</strong> &mdash; each block adds a small correction rather than replacing the representation. The stream is the token's current best guess of itself; attention and MLP heads read and write features into it.</li>
+        <li>Without residuals, deep Transformers (~&gt; 10 layers) fail to train. Extreme-depth experiments (DeepNet, ResPost-LN, 1000-layer models) all depend on carefully scaled residual paths.</li>
+      </ul>
+      <p class="answer">Together with LayerNorm, residuals are the two ingredients that let Transformer depth scale to hundreds of layers without collapse.</p>`,
+    src: "He et al. — Deep Residual Learning; Elhage et al. — A Mathematical Framework for Transformer Circuits",
+    url: "https://transformer-circuits.pub/2021/framework/index.html"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "How does byte-pair encoding (BPE) work, and why is it preferred over word- or character-level tokens?",
+    body: `
+      <p class="answer">BPE builds a subword vocabulary greedily from a training corpus:</p>
+      <ul class="points">
+        <li>Start with each character (or byte) as its own token.</li>
+        <li>Find the most frequent adjacent pair; merge it into a new token; add to the vocab.</li>
+        <li>Repeat until you hit a target vocab size (32k&ndash;100k typical).</li>
+      </ul>
+      <ul class="points">
+        <li><strong>Vs words</strong> &mdash; no OOV problem; sub-word merges handle "unfriendliness" as "un" + "friend" + "li" + "ness".</li>
+        <li><strong>Vs chars</strong> &mdash; sequences are far shorter, so O(n&sup2;) attention is much cheaper.</li>
+        <li>Modern variants: <strong>byte-level BPE</strong> (GPT-2 onward) operates on UTF-8 bytes so any Unicode is representable; <strong>SentencePiece</strong> makes tokenization language-agnostic (no pre-tokenization step).</li>
+      </ul>`,
+    src: "Sennrich et al. — Neural Machine Translation of Rare Words with Subword Units",
+    url: "https://arxiv.org/abs/1508.07909"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What are Multi-Query and Grouped-Query Attention, and what do they trade off against standard MHA?",
+    body: `
+      <p class="answer">Standard multi-head attention has separate <em>K</em> and <em>V</em> projections per head. Those K, V tensors are the bulk of the <strong>KV cache</strong> &mdash; the memory bottleneck at inference time.</p>
+      <ul class="points">
+        <li><strong>MHA</strong> (Vaswani) &mdash; H heads, each with its own K, V. Highest quality, biggest cache.</li>
+        <li><strong>MQA</strong> (Shazeer) &mdash; H query heads share a <strong>single</strong> K, V. Cache shrinks H&times; but quality drops on many tasks.</li>
+        <li><strong>GQA</strong> (Ainslie) &mdash; H query heads split into G groups; each group shares one K, V. G is the knob: G=1 is MQA, G=H is MHA.</li>
+      </ul>
+      <p class="answer">GQA is the modern default (LLaMA&nbsp;2+, Mistral, Gemma) because it recovers most of MHA's quality with a much smaller cache, enabling longer contexts and larger inference batches on the same hardware.</p>`,
+    src: "Ainslie et al. — GQA: Training Generalized Multi-Query Transformer Models",
+    url: "https://arxiv.org/abs/2305.13245"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is Flash Attention, and what bottleneck does it fix?",
+    body: `
+      <p class="answer">Attention is <strong>memory-bandwidth bound</strong> on modern GPUs, not compute bound. The naive implementation materializes the N&times;N attention matrix in HBM (slow global memory) and reads/writes it many times.</p>
+      <ul class="points">
+        <li>FlashAttention <strong>tiles</strong> Q, K, V into blocks that fit in on-chip SRAM.</li>
+        <li>Computes softmax and the weighted-sum output <strong>in a fused streaming pass</strong> per block, using the online-softmax trick &mdash; no full N&times;N matrix ever hits HBM.</li>
+        <li>Result: identical numerics, 2&ndash;4&times; faster wall-clock, and enough memory savings to support far longer contexts.</li>
+      </ul>
+      <p class="answer">Follow-ups: <strong>FlashAttention-2</strong> improves work partitioning across warps; <strong>FlashAttention-3</strong> exploits Hopper's async copies and FP8. A case study in "same algorithm, hardware-aware implementation".</p>`,
+    src: "Dao et al. — FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+    url: "https://arxiv.org/abs/2205.14135"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "Why is self-attention O(n&sup2;) in sequence length, and what are the leading long-context mitigations?",
+    body: `
+      <p class="answer">Every token attends to every other, so the QK<sup>T</sup> score matrix is n&times;n and the softmax + weighted-sum are quadratic in the sequence length. Total cost is O(n&sup2;&thinsp;d).</p>
+      <ul class="points">
+        <li><strong>Sparse patterns</strong> (Longformer, BigBird) &mdash; local window + a few global tokens; O(n&thinsp;w).</li>
+        <li><strong>Sliding window</strong> (Mistral) &mdash; each token attends to the last w tokens; stacked layers grow the effective receptive field.</li>
+        <li><strong>Linear / kernelized attention</strong> (Linformer, Performer) &mdash; softmax approximations that give O(n&thinsp;d&sup2;). Rare in top LLMs due to quality loss.</li>
+        <li><strong>State-space models</strong> (Mamba, S4) &mdash; sub-quadratic sequence mixing that is competitive with attention on long sequences.</li>
+        <li><strong>Hardware</strong> &mdash; FlashAttention makes exact O(n&sup2;) attention practical to ~1M tokens on modern GPUs, so many "efficient attention" tricks are less needed than they were.</li>
+      </ul>`,
+    src: "Tay et al. — Efficient Transformers: A Survey",
+    url: "https://arxiv.org/abs/2009.06732"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is a Mixture-of-Experts layer, and why does it scale differently from a dense Transformer?",
+    body: `
+      <p class="answer">A <strong>sparse MoE</strong> replaces the dense FFN with N expert MLPs plus a lightweight router. For each token, the router picks the top-k experts (usually k=1 or 2) and combines their outputs.</p>
+      <div class="eq">
+        <math display="block">
+          <mi>y</mi>
+          <mo>=</mo>
+          <munder>
+            <mo>&#x2211;</mo>
+            <mrow><mi>e</mi><mo>&#x2208;</mo><mtext>TopK</mtext><mo>(</mo><mtext>router</mtext><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo></mrow>
+          </munder>
+          <msub><mi>g</mi><mi>e</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo>
+          <mo>&#x22C5;</mo>
+          <msub><mtext>Expert</mtext><mi>e</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>Total params</strong> grow with N (huge "capacity"), but <strong>active params per token</strong> stay roughly fixed &mdash; cheap FLOPs per token.</li>
+        <li>Enables ~700B-parameter models (Mixtral, DeepSeek-V3) at the inference cost of a much smaller dense model.</li>
+        <li>Challenges: <strong>load-balancing losses</strong> to keep experts equally used, all-to-all communication in distributed training, and finicky fine-tuning.</li>
+      </ul>`,
+    src: "Fedus et al. — Switch Transformers; Shazeer et al. — Outrageously Large Neural Networks",
+    url: "https://arxiv.org/abs/2101.03961"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "Why do modern LLMs use SwiGLU in the FFN instead of ReLU or GELU?",
+    body: `
+      <p class="answer">The vanilla FFN is <em>W&#x2082;&thinsp;&sdot;&thinsp;GELU(W&#x2081;&thinsp;x)</em>. <strong>GLU variants</strong> introduce a multiplicative gating branch:</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>SwiGLU</mtext><mo>(</mo><mi>x</mi><mo>)</mo>
+          <mo>=</mo>
+          <mo>(</mo><mtext>Swish</mtext><mo>(</mo><mi>x</mi><msub><mi>W</mi><mn>1</mn></msub><mo>)</mo>
+          <mo>&#x2299;</mo>
+          <mo>(</mo><mi>x</mi><msub><mi>W</mi><mn>3</mn></msub><mo>)</mo><mo>)</mo>
+          <msub><mi>W</mi><mn>2</mn></msub>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Two projections multiplied elementwise &mdash; the multiplicative interaction is more expressive per neuron than any pointwise nonlinearity alone.</li>
+        <li>Better perplexity per FLOP than GELU on decoder LLMs (Shazeer, LLaMA ablations).</li>
+        <li>Standard trick: shrink the hidden dim by 2/3 so total FFN params stay the same &mdash; and the model still wins.</li>
+      </ul>
+      <p class="answer">Standard in LLaMA, PaLM, Mistral, DeepSeek. GELU still dominates encoder models (BERT-style) where the marginal FFN win is smaller.</p>`,
+    src: "Shazeer — GLU Variants Improve Transformer",
+    url: "https://arxiv.org/abs/2002.05202"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is supervised fine-tuning (SFT / instruction tuning), and what are its limits?",
+    body: `
+      <p class="answer">SFT continues pretraining on a curated dataset of <em>(instruction, response)</em> pairs, using the standard next-token cross-entropy loss. The base LM's distribution shifts toward following instructions and producing chat-formatted outputs.</p>
+      <ul class="points">
+        <li>Cheap and stable &mdash; same loss as pretraining, no reward model, no RL.</li>
+        <li>Effective at teaching <strong>format</strong> (JSON, markdown, chat) and <strong>surface behaviour</strong>.</li>
+        <li><strong>Limits</strong>: SFT only imitates the demonstration distribution. It can't distinguish "good" from "great" responses, and it doesn't discourage plausible-but-wrong outputs the demonstrator wouldn't have generated. This is the gap RLHF and DPO were designed to close.</li>
+        <li>Over-SFT'ing narrows the model's capability distribution and can degrade zero-shot generalization &mdash; the "alignment tax".</li>
+      </ul>`,
+    src: "Ouyang et al. — Training language models to follow instructions with human feedback (InstructGPT)",
+    url: "https://arxiv.org/abs/2203.02155"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is DPO, and how does it eliminate the reward model from RLHF?",
+    body: `
+      <p class="answer"><strong>Direct Preference Optimization</strong> reformulates RLHF as a supervised classification problem over preference pairs.</p>
+      <p class="answer">The KL-regularized RL objective has a closed-form optimal policy &pi;* whose likelihood ratio to the reference is proportional to the implicit reward. DPO substitutes this back and gets a loss purely in terms of &pi; and &pi;<sub>ref</sub>:</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>&#x2112;</mi><mtext>DPO</mtext></msub>
+          <mo>=</mo>
+          <mo>&#x2212;</mo><mi>log</mi><mi>&#x03C3;</mi>
+          <mo>(</mo>
+          <mi>&#x03B2;</mi><mo>[</mo>
+          <mi>log</mi><mfrac><mrow><mi>&#x03C0;</mi><mo>(</mo><msub><mi>y</mi><mo>+</mo></msub><mo>|</mo><mi>x</mi><mo>)</mo></mrow><mrow><msub><mi>&#x03C0;</mi><mtext>ref</mtext></msub><mo>(</mo><msub><mi>y</mi><mo>+</mo></msub><mo>|</mo><mi>x</mi><mo>)</mo></mrow></mfrac>
+          <mo>&#x2212;</mo>
+          <mi>log</mi><mfrac><mrow><mi>&#x03C0;</mi><mo>(</mo><msub><mi>y</mi><mo>&#x2212;</mo></msub><mo>|</mo><mi>x</mi><mo>)</mo></mrow><mrow><msub><mi>&#x03C0;</mi><mtext>ref</mtext></msub><mo>(</mo><msub><mi>y</mi><mo>&#x2212;</mo></msub><mo>|</mo><mi>x</mi><mo>)</mo></mrow></mfrac>
+          <mo>]</mo>
+          <mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>No separate reward model, no PPO &mdash; one loss, one gradient pass per preference pair.</li>
+        <li>Stabler than PPO in practice; the modern default for open-weight preference alignment.</li>
+        <li>Trade-off: DPO is more sensitive to preference-data noise, and can drift further from the reference policy without careful &beta; tuning.</li>
+      </ul>`,
+    src: "Rafailov et al. — Direct Preference Optimization",
+    url: "https://arxiv.org/abs/2305.18290"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is Retrieval-Augmented Generation (RAG), and when is it preferred over fine-tuning?",
+    body: `
+      <p class="answer">RAG augments an LLM with a <strong>retrieve-then-read</strong> pipeline: encode a query, fetch top-k relevant chunks from an external corpus (usually via dense-vector similarity), concatenate them into the prompt, generate.</p>
+      <ul class="points">
+        <li><strong>RAG wins when</strong> the knowledge is external, changes frequently, or is proprietary. New documents just get indexed; no retraining. Citations become straightforward.</li>
+        <li><strong>Fine-tuning wins when</strong> you're teaching a <em>skill</em> or <em>style</em>, not a fact &mdash; domain jargon, output format, code idioms.</li>
+        <li>They compose &mdash; a fine-tuned model that also retrieves usually beats either alone.</li>
+      </ul>
+      <p class="answer">Failure modes: retrieval misses (bad embeddings or chunking), context-window pollution (irrelevant chunks distract the model), and the "lost-in-the-middle" positional bias where mid-context evidence is under-used.</p>`,
+    src: "Lewis et al. — Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+    url: "https://arxiv.org/abs/2005.11401"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is in-context learning, and how do current theories explain it?",
+    body: `
+      <p class="answer"><strong>In-context learning (ICL)</strong>: giving an LLM a few input&ndash;output demonstrations at inference time causes it to solve new instances of the task, with no weight updates.</p>
+      <ul class="points">
+        <li><strong>Bayesian view</strong> &mdash; the demonstrations select from a mixture of tasks the model already learned during pretraining. ICL updates the posterior over which task is being asked, not the parameters.</li>
+        <li><strong>Implicit gradient-descent view</strong> &mdash; attention over demonstrations can be shown to implement one step of gradient descent on a linear regression head (von Oswald et al., 2022). ICL as "meta-optimization inside the forward pass".</li>
+        <li>Both views agree: ICL is <strong>selecting</strong> from the pretraining distribution, not learning new capabilities. Out-of-distribution tasks fail.</li>
+      </ul>
+      <p class="answer">Practical implication: label format and demonstration order matter a lot &mdash; the model latches on to surface patterns before task semantics.</p>`,
+    src: "Brown et al. — Language Models are Few-Shot Learners (GPT-3); Xie et al. — An Explanation of In-context Learning as Implicit Bayesian Inference",
+    url: "https://arxiv.org/abs/2005.14165"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is chain-of-thought prompting, and when does it actually help?",
+    body: `
+      <p class="answer"><strong>Chain-of-thought (CoT)</strong> prompting elicits intermediate reasoning steps before the final answer, either via few-shot demonstrations that include reasoning or via a zero-shot trigger like "Let's think step by step" (Kojima et al.).</p>
+      <ul class="points">
+        <li>Improves multi-step arithmetic, symbolic reasoning, and word problems dramatically at ~50B+ parameters.</li>
+        <li>Below that scale, CoT can <em>hurt</em> &mdash; small models produce incoherent chains that lead the answer astray.</li>
+        <li>Mechanism: extra tokens = extra compute. The model gets more forward passes to work through subproblems and cache partial results into the residual stream.</li>
+      </ul>
+      <p class="answer">Modern "reasoning models" (o1, DeepSeek-R1, thinking variants of Claude) internalize this &mdash; RL-trained to spend variable compute on CoT before answering. CoT is no longer a prompting trick; it's an architectural budget.</p>`,
+    src: "Wei et al. — Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+    url: "https://arxiv.org/abs/2201.11903"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "Why do LLMs hallucinate, and how do we mitigate it?",
+    body: `
+      <p class="answer">An LLM is trained to model <em>p(next token | context)</em>, not to be truthful. It has no separate notion of what it "knows"; the loss rewards plausibility, not correctness.</p>
+      <ul class="points">
+        <li><strong>Root causes</strong> &mdash; long-tail knowledge is thinly represented in training data; the softmax always assigns non-zero mass to something; the model has no calibrated uncertainty on facts.</li>
+        <li><strong>SFT can make it worse</strong> &mdash; training on demonstrations of confident answers teaches the model to <em>sound</em> certain even when the base model was appropriately unsure.</li>
+      </ul>
+      <ul class="points">
+        <li><strong>Retrieval / RAG</strong> &mdash; inject facts, cite them, condition generation on them.</li>
+        <li><strong>Tool use</strong> &mdash; offload calculation, code, search to external tools that don't hallucinate.</li>
+        <li><strong>Consistency checks</strong> &mdash; self-consistency sampling, verifier models, chain-of-verification.</li>
+        <li><strong>Preference training for abstention</strong> &mdash; reward "I don't know" over confident wrong answers.</li>
+      </ul>`,
+    src: "Ji et al. — Survey of Hallucination in Natural Language Generation",
+    url: "https://arxiv.org/abs/2202.03629"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "Compare INT8 vs INT4 quantization for LLMs. What are GPTQ and AWQ?",
+    body: `
+      <p class="answer"><strong>Quantization</strong> stores weights (and sometimes activations) in lower-precision integers, cutting memory and speeding up memory-bound operations.</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>w</mi><mtext>q</mtext></msub>
+          <mo>=</mo>
+          <mtext>round</mtext><mo>(</mo><mi>w</mi><mo>/</mo><mi>s</mi><mo>)</mo>
+          <mo>,</mo>
+          <mspace width="1em"/>
+          <mover><mi>w</mi><mo>^</mo></mover>
+          <mo>=</mo>
+          <msub><mi>w</mi><mtext>q</mtext></msub><mo>&#x22C5;</mo><mi>s</mi>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>INT8</strong> &mdash; near-lossless for weights + activations. Standard for deployment.</li>
+        <li><strong>INT4</strong> &mdash; 4&times; smaller than FP16; quality degrades noticeably unless you're clever about outliers.</li>
+        <li><strong>GPTQ</strong> &mdash; post-training, layer-by-layer OBQ-style: use the Hessian of the layer's output to pick quantized values that minimize error. INT4 with ~1% ppl gap.</li>
+        <li><strong>AWQ</strong> &mdash; observe that a small fraction of weight channels (tied to activation outliers) matter disproportionately. Protect them via per-channel scaling before rounding.</li>
+      </ul>
+      <p class="answer">Both target the same failure mode: outliers. INT8 has enough dynamic range to absorb them; INT4 doesn't, so you either shape the distribution (AWQ) or fit an optimal grid (GPTQ).</p>`,
+    src: "Frantar et al. — GPTQ; Lin et al. — AWQ",
+    url: "https://arxiv.org/abs/2210.17323"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "How does speculative decoding accelerate LLM inference without changing outputs?",
+    body: `
+      <p class="answer">A small <strong>draft model</strong> proposes k tokens autoregressively (cheap). The large <strong>target model</strong> then evaluates all k in a single forward pass and accepts the longest prefix that matches its own distribution under a <strong>rejection-sampling</strong> rule.</p>
+      <p class="answer">Accept a draft token <em>x</em> with probability</p>
+      <div class="eq">
+        <math display="block">
+          <mi>min</mi><mo>(</mo><mn>1</mn><mo>,</mo>
+          <mfrac>
+            <mrow><mi>p</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow>
+            <mrow><mi>q</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow>
+          </mfrac>
+          <mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li><em>p</em> is the target distribution, <em>q</em> is the draft distribution.</li>
+        <li>On acceptance, the target's forward pass has already produced its own next token &mdash; a "free" extra token.</li>
+        <li>The output distribution is <strong>exactly</strong> the target's; only speed changes.</li>
+        <li>Effective when the draft agrees often &mdash; typically 2&ndash;3&times; throughput for chat, less for hard reasoning tasks.</li>
+      </ul>`,
+    src: "Leviathan et al. — Fast Inference from Transformers via Speculative Decoding",
+    url: "https://arxiv.org/abs/2211.17192"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "What is test-time compute scaling, and how does it differ from pretraining scaling?",
+    body: `
+      <p class="answer">Instead of (or in addition to) growing the model, spend more compute <em>at inference time</em> &mdash; long chain-of-thought, sampling many candidates, tree search, verifier reranking. The idea: on hard problems, the model has spare capacity that a single forward pass doesn't tap.</p>
+      <ul class="points">
+        <li><strong>Empirical finding</strong> (Snell et al., OpenAI o1) &mdash; for reasoning-heavy tasks, doubling inference compute often beats doubling parameters. A different scaling curve from Chinchilla.</li>
+        <li><strong>Reasoning models</strong> (o1, DeepSeek-R1, Claude's thinking mode) are RL-trained to produce useful long CoT rather than eyeballing an answer.</li>
+        <li>Practical dial: sampling temperature, number of samples, majority voting, verifier score threshold, or an explicit "reasoning budget" token count.</li>
+      </ul>
+      <p class="answer">Trade-off: latency and cost scale linearly with the compute budget. Reasoning models are wildly better at math/code and only marginally better at straightforward chat &mdash; pick per task.</p>`,
+    src: "OpenAI — Learning to Reason with LLMs (o1); Snell et al. — Scaling LLM Test-Time Compute Optimally",
+    url: "https://arxiv.org/abs/2408.03314"
+  },
+  {
+    cat: "Transformers & LLMs",
+    q: "Compare data, tensor, and pipeline parallelism for training LLMs. Where does FSDP / ZeRO fit?",
+    body: `
+      <ul class="points">
+        <li><strong>Data parallelism (DP)</strong> &mdash; replicate the model on every GPU, split the batch. Simple; hits a wall when the model itself doesn't fit on one device.</li>
+        <li><strong>Tensor parallelism (TP)</strong> &mdash; split individual weight matrices across GPUs; each GPU holds a slice of every layer. Heavy intra-layer communication; only works well inside a single high-bandwidth node.</li>
+        <li><strong>Pipeline parallelism (PP)</strong> &mdash; split layers across GPUs; micro-batch to keep the pipeline full. Cross-node friendly. Bubbles at start and end are the main inefficiency.</li>
+        <li><strong>FSDP / ZeRO</strong> &mdash; a smarter DP: shard the <strong>optimizer state</strong> (ZeRO-1), then <strong>gradients</strong> (ZeRO-2), then <strong>parameters</strong> (ZeRO-3 / FSDP). Params get all-gathered just in time for each layer's forward/backward, then re-sharded.</li>
+      </ul>
+      <p class="answer">Real training combines them: TP inside a node, PP across nodes, FSDP for optimizer/gradient memory &mdash; a "3D parallel" mesh (Megatron-LM style).</p>`,
+    src: "Shoeybi et al. — Megatron-LM; Rajbhandari et al. — ZeRO",
+    url: "https://arxiv.org/abs/1909.08053"
+  },
 
   /* ===================== REINFORCEMENT LEARNING ===================== */
   {
