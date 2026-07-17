@@ -603,6 +603,726 @@ const CARDS = [
     src: "Srivastava et al. — Dropout (JMLR 2014)",
     url: "https://jmlr.org/papers/v15/srivastava14a.html"
   },
+  {
+    cat: "Deep Learning",
+    q: "Why do we need careful weight initialization? Contrast Xavier, He, and orthogonal init.",
+    body: `
+      <p class="answer">In a deep network, if per-layer output variance grows or shrinks, activations blow up or collapse to zero &mdash; and gradients follow. Initialization sets the variance so activations stay roughly unit-scale across layers.</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>Xavier:&nbsp;</mtext>
+          <mtext>Var</mtext><mo>(</mo><mi>W</mi><mo>)</mo><mo>=</mo>
+          <mfrac><mn>1</mn><msub><mi>n</mi><mtext>in</mtext></msub></mfrac>
+          <mspace width="2em"/>
+          <mtext>He:&nbsp;</mtext>
+          <mtext>Var</mtext><mo>(</mo><mi>W</mi><mo>)</mo><mo>=</mo>
+          <mfrac><mn>2</mn><msub><mi>n</mi><mtext>in</mtext></msub></mfrac>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>Xavier / Glorot</strong> &mdash; derived for symmetric activations (tanh); balances forward and backward variance.</li>
+        <li><strong>He / Kaiming</strong> &mdash; adds a factor of 2 to compensate for ReLU zeroing half the activations. Standard for ReLU nets.</li>
+        <li><strong>Orthogonal</strong> &mdash; W has orthonormal rows/columns; singular values are all 1. Preserves gradient norm exactly through linear layers; used in deep RNNs.</li>
+      </ul>
+      <p class="answer">Modern Transformers scale init by depth (e.g. divide residual-branch init by &#x221A;(2L)) to keep the residual stream from exploding as layers stack.</p>`,
+    src: "He et al. — Delving Deep into Rectifiers (He init); Glorot & Bengio — Xavier init",
+    url: "https://arxiv.org/abs/1502.01852"
+  },
+  {
+    cat: "Deep Learning",
+    q: "Compare warmup+cosine, one-cycle, and step-decay LR schedules. Why does warmup matter?",
+    body: `
+      <ul class="points">
+        <li><strong>Step decay</strong> &mdash; drop LR by 10&times; at fixed epochs. Simple but coarse.</li>
+        <li><strong>Cosine annealing</strong> &mdash; smooth cosine curve from &#x03B7;<sub>max</sub> to ~0 over a schedule; often with warm restarts (SGDR).</li>
+        <li><strong>One-cycle</strong> (Smith) &mdash; ramp LR up then down, with inverse momentum. Fast convergence, acts as a regularizer.</li>
+        <li><strong>Linear warmup</strong> &mdash; ramp LR from 0 to peak over 1&ndash;10k steps. Critical for large-batch training and Adam-based Transformer training, where the second-moment estimate is unreliable at step 0.</li>
+      </ul>
+      <p class="answer">Transformers universally use warmup + cosine (or linear) decay. Without warmup, the first steps see huge, poorly conditioned updates that push the model into a bad region.</p>`,
+    src: "Loshchilov & Hutter — SGDR; Smith — Super-Convergence / One-Cycle",
+    url: "https://arxiv.org/abs/1608.03983"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is gradient clipping, and when is it necessary?",
+    body: `
+      <p class="answer">Rescale the gradient if its norm exceeds a threshold &#x03C4;:</p>
+      <div class="eq">
+        <math display="block">
+          <mi>g</mi><mo>&#x2190;</mo>
+          <mi>g</mi><mo>&#x22C5;</mo>
+          <mi>min</mi><mo>(</mo><mn>1</mn><mo>,</mo>
+          <mfrac><mi>&#x03C4;</mi><mrow><mo>&#x2016;</mo><mi>g</mi><mo>&#x2016;</mo></mrow></mfrac><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Prevents exploding-gradient blowups in RNNs and any deep net with cliff-shaped loss landscapes.</li>
+        <li>Standard practice for Transformer training (clip to 1.0 is a common default), and essential for RL policy-gradient methods.</li>
+        <li><strong>Global norm clipping</strong> (all params as one vector) beats per-parameter clipping because it preserves gradient <em>direction</em>.</li>
+      </ul>`,
+    src: "Pascanu et al. — On the Difficulty of Training Recurrent Neural Networks",
+    url: "https://arxiv.org/abs/1211.5063"
+  },
+  {
+    cat: "Deep Learning",
+    q: "How does mixed-precision training with fp16/bf16 work? What is loss scaling?",
+    body: `
+      <p class="answer">Store weights, activations, and gradients in low precision (fp16 or bf16) while keeping a master fp32 copy of the weights for the optimizer step. Halves memory, doubles throughput on tensor cores.</p>
+      <ul class="points">
+        <li><strong>fp16</strong> has a narrow dynamic range (~10<sup>&#x2212;5</sup>&ndash;10<sup>5</sup>) &mdash; small gradients underflow to zero. Fix: <strong>loss scaling</strong>, multiply the loss by a large constant before backprop, unscale gradients before the optimizer step.</li>
+        <li><strong>bf16</strong> has fp32's exponent range but only 7 mantissa bits &mdash; no underflow, no loss scaling needed. Default on TPU and modern GPUs.</li>
+        <li>Master fp32 weights avoid accumulating rounding error over the many small updates SGD makes.</li>
+      </ul>`,
+    src: "Micikevicius et al. — Mixed Precision Training",
+    url: "https://arxiv.org/abs/1710.03740"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is gradient accumulation, and how does it relate to effective batch size?",
+    body: `
+      <p class="answer">Run k mini-batches, sum their gradients without stepping the optimizer, then step once. Effective batch size = k &times; micro-batch size.</p>
+      <ul class="points">
+        <li>Lets you simulate a large batch on a device that can only hold a small one &mdash; critical for training big models on limited GPU memory.</li>
+        <li>Learning-rate scaling still applies (linear or square-root LR with batch size).</li>
+        <li>BatchNorm doesn't fully benefit &mdash; it sees only the micro-batch statistics; another reason LayerNorm dominates at scale.</li>
+        <li>Combines with mixed precision, gradient checkpointing, and FSDP to fit models otherwise too large.</li>
+      </ul>`,
+    src: "Ott et al. — Scaling Neural Machine Translation (fairseq)",
+    url: "https://arxiv.org/abs/1806.00187"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is gradient checkpointing (activation recomputation), and what does it trade off?",
+    body: `
+      <p class="answer">During the forward pass, discard most intermediate activations and keep only a few "checkpoints". During backprop, recompute the discarded activations from the nearest checkpoint on the fly.</p>
+      <ul class="points">
+        <li><strong>Memory</strong> drops from O(L) to O(&#x221A;L) with evenly spaced checkpoints (Chen et al., 2016).</li>
+        <li><strong>Compute</strong> is ~1.33&times; a normal backward pass &mdash; one extra forward pass per segment.</li>
+        <li>Enables training networks that otherwise wouldn't fit in memory, at ~30% wall-clock cost.</li>
+        <li>Common with FlashAttention, FSDP, or long-context Transformers.</li>
+      </ul>`,
+    src: "Chen et al. — Training Deep Nets with Sublinear Memory Cost",
+    url: "https://arxiv.org/abs/1604.06174"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is weight tying between input and output embeddings, and why does it help?",
+    body: `
+      <p class="answer">Share the parameters of the token-embedding matrix and the output projection ("head") &mdash; both use the same W. Standard in RNN LMs, GPT, and BERT.</p>
+      <ul class="points">
+        <li>Halves the embedding parameters &mdash; a large fraction of small Transformer params.</li>
+        <li>Strong prior: the vector used to represent a token as input should be the direction that scores highly at output.</li>
+        <li>Improves perplexity almost universally (Press & Wolf, 2016).</li>
+        <li>Very large models (e.g. LLaMA-3 70B) sometimes untie because the embedding matters less at scale and untying gives a small quality win.</li>
+      </ul>`,
+    src: "Press & Wolf — Using the Output Embedding to Improve Language Models",
+    url: "https://arxiv.org/abs/1608.05859"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is label smoothing, and why does it help calibration?",
+    body: `
+      <p class="answer">Instead of one-hot targets, use a mixture with uniform noise:</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>y</mi><mtext>LS</mtext></msub>
+          <mo>=</mo>
+          <mo>(</mo><mn>1</mn><mo>&#x2212;</mo><mi>&#x03B5;</mi><mo>)</mo>
+          <mo>&#x22C5;</mo>
+          <mtext>onehot</mtext>
+          <mo>+</mo>
+          <mfrac><mi>&#x03B5;</mi><mi>K</mi></mfrac>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Prevents the model from becoming arbitrarily confident on the training labels (logits would otherwise explode).</li>
+        <li>Yields much better <strong>calibration</strong> &mdash; predicted probabilities more closely match empirical accuracy.</li>
+        <li>Small consistent quality bump on classification and NMT.</li>
+        <li>Trade-off: it slightly compresses learned representations, hurting distillation and confidence-based abstention (Mueller et al., 2019).</li>
+      </ul>`,
+    src: "Szegedy et al. — Rethinking Inception (Sec. 7); Mueller et al. — When Does Label Smoothing Help?",
+    url: "https://arxiv.org/abs/1906.02629"
+  },
+  {
+    cat: "Deep Learning",
+    q: "SGD+momentum vs Adam — which do you pick for which task, and why?",
+    body: `
+      <ul class="points">
+        <li><strong>SGD+momentum</strong> often gives the best test accuracy for large-scale supervised vision (ResNet on ImageNet). Sharper optima than Adam but slower convergence; requires careful LR tuning.</li>
+        <li><strong>Adam / AdamW</strong> converges faster and is largely LR-insensitive. Standard for Transformers, RNNs, GANs, RL. Its per-parameter LR handles the different scales of embedding, attention, and FFN weights.</li>
+        <li>Adam's flatter, wider minima are believed to generalize slightly worse on curated benchmarks &mdash; the gap has largely closed with AdamW + tuned weight decay.</li>
+        <li>Rule of thumb: SGD for CNNs on well-behaved supervised loss; Adam(W) for anything with heterogeneous parameter scales, sparse gradients, or non-stationary objectives (RL, GAN).</li>
+      </ul>`,
+    src: "Wilson et al. — The Marginal Value of Adaptive Gradient Methods",
+    url: "https://arxiv.org/abs/1705.08292"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What's the difference between Adam and AdamW? Why did people move to AdamW?",
+    body: `
+      <p class="answer">Standard Adam applies L2 regularization by adding &#x03BB;w to the gradient before the Adam update. That gets divided by Adam's per-parameter second-moment scaling &mdash; so weights with large gradients see almost no decay, weights with small gradients get too much.</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>AdamW:&nbsp;</mtext>
+          <msub><mi>w</mi><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></msub>
+          <mo>=</mo>
+          <msub><mi>w</mi><mi>t</mi></msub>
+          <mo>&#x2212;</mo>
+          <mi>&#x03B7;</mi>
+          <mfenced><mrow>
+            <mfrac><msub><mover><mi>m</mi><mo>^</mo></mover><mi>t</mi></msub><mrow><msqrt><msub><mover><mi>v</mi><mo>^</mo></mover><mi>t</mi></msub></msqrt><mo>+</mo><mi>&#x03B5;</mi></mrow></mfrac>
+            <mo>+</mo>
+            <mi>&#x03BB;</mi><msub><mi>w</mi><mi>t</mi></msub>
+          </mrow></mfenced>
+        </math>
+      </div>
+      <ul class="points">
+        <li>AdamW <strong>decouples</strong> weight decay from the adaptive step &mdash; adds &#x03B7;&#x03BB;w directly to the update.</li>
+        <li>Now every weight decays uniformly, matching what "weight decay" was supposed to mean.</li>
+        <li>Often worth a full point of accuracy or several ppl of language modeling. AdamW is the default in every modern LLM training run.</li>
+      </ul>`,
+    src: "Loshchilov & Hutter — Decoupled Weight Decay Regularization",
+    url: "https://arxiv.org/abs/1711.05101"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is Nesterov Accelerated Gradient, and how does it differ from plain momentum?",
+    body: `
+      <p class="answer">Plain momentum evaluates the gradient at the current point, then adds the momentum vector. <strong>Nesterov</strong> first takes a step in the momentum direction (a "lookahead"), evaluates the gradient <em>there</em>, then combines.</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>Nesterov:&nbsp;</mtext>
+          <msub><mi>v</mi><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></msub>
+          <mo>=</mo>
+          <mi>&#x03B2;</mi><msub><mi>v</mi><mi>t</mi></msub>
+          <mo>+</mo>
+          <mo>&#x2207;</mo><mi>L</mi><mo>(</mo><msub><mi>&#x03B8;</mi><mi>t</mi></msub><mo>&#x2212;</mo><mi>&#x03B7;</mi><mi>&#x03B2;</mi><msub><mi>v</mi><mi>t</mi></msub><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>The lookahead lets NAG "see" that it's overshooting and course-correct earlier &mdash; especially helpful on convex problems.</li>
+        <li>Convergence rate O(1/k&sup2;) for smooth convex functions vs O(1/k) for plain gradient descent (Nesterov's original result).</li>
+        <li>In deep learning the practical gain over plain momentum is modest; Adam-family optimizers dominate anyway.</li>
+      </ul>`,
+    src: "Sutskever et al. — On the Importance of Initialization and Momentum in Deep Learning",
+    url: "https://icml.cc/2013/wp-content/uploads/2013/03/sutskever13.pdf"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is Sharpness-Aware Minimization (SAM), and why does it improve generalization?",
+    body: `
+      <p class="answer">Instead of minimizing the loss at &#x03B8;, minimize the <em>worst</em> loss in an &#x03C1;-ball around &#x03B8;:</p>
+      <div class="eq">
+        <math display="block">
+          <munder><mi>min</mi><mi>&#x03B8;</mi></munder>
+          <munder><mi>max</mi><mrow><mo>&#x2016;</mo><mi>&#x03B5;</mi><mo>&#x2016;</mo><mo>&#x2264;</mo><mi>&#x03C1;</mi></mrow></munder>
+          <mi>L</mi><mo>(</mo><mi>&#x03B8;</mi><mo>+</mo><mi>&#x03B5;</mi><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Approximate the inner max with one gradient-ascent step: perturb &#x03B8; toward the worst nearby loss, then take a normal SGD step at that perturbed point.</li>
+        <li>Biases training toward <strong>flat minima</strong>, which correlate with better generalization (Keskar et al., 2016).</li>
+        <li>Roughly doubles training cost (extra forward + backward for the perturbation).</li>
+        <li>Notable wins on ImageNet, robustness benchmarks, and fine-tuning small datasets.</li>
+      </ul>`,
+    src: "Foret et al. — Sharpness-Aware Minimization for Efficiently Improving Generalization",
+    url: "https://arxiv.org/abs/2010.01412"
+  },
+  {
+    cat: "Deep Learning",
+    q: "Second-order methods (Newton, K-FAC) should converge in fewer steps. Why don't we use them?",
+    body: `
+      <ul class="points">
+        <li>Exact Newton needs the inverse Hessian &mdash; O(N&sup3;) per step where N = # parameters. Infeasible for millions of weights.</li>
+        <li>Approximations exist (L-BFGS, K-FAC, Shampoo) but require careful preconditioning, damping, and don't play well with mini-batch noise &mdash; the Hessian estimate is very noisy.</li>
+        <li>SGD/Adam already implicitly use curvature via momentum and per-parameter step sizes &mdash; enough for deep learning's typical mildly-nonconvex, badly-scaled loss.</li>
+        <li>Second-order methods are competitive in specific regimes: full-batch training, distributed at extreme scale (Shampoo has powered a few big LLM runs), and small-data fine-tuning.</li>
+      </ul>`,
+    src: "Martens & Grosse — Optimizing Neural Networks with Kronecker-Factored Approximate Curvature (K-FAC)",
+    url: "https://arxiv.org/abs/1503.05671"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What are Mixup and CutMix, and why do they regularize so effectively?",
+    body: `
+      <p class="answer"><strong>Mixup</strong> trains on convex combinations of pairs:</p>
+      <div class="eq">
+        <math display="block">
+          <mover><mi>x</mi><mo>~</mo></mover><mo>=</mo>
+          <mi>&#x03BB;</mi><msub><mi>x</mi><mi>i</mi></msub><mo>+</mo><mo>(</mo><mn>1</mn><mo>&#x2212;</mo><mi>&#x03BB;</mi><mo>)</mo><msub><mi>x</mi><mi>j</mi></msub>
+          <mo>,</mo>
+          <mspace width="1em"/>
+          <mover><mi>y</mi><mo>~</mo></mover><mo>=</mo>
+          <mi>&#x03BB;</mi><msub><mi>y</mi><mi>i</mi></msub><mo>+</mo><mo>(</mo><mn>1</mn><mo>&#x2212;</mo><mi>&#x03BB;</mi><mo>)</mo><msub><mi>y</mi><mi>j</mi></msub>
+        </math>
+      </div>
+      <p class="answer"><strong>CutMix</strong>: paste a rectangular patch of one image into another, mixing labels proportional to the patch area.</p>
+      <ul class="points">
+        <li>Encourages linear interpolation of predictions between training examples &mdash; smooths the decision boundary.</li>
+        <li>Improves accuracy, calibration, and adversarial robustness with essentially no compute cost.</li>
+        <li>Common component of modern augmentation recipes alongside RandAugment.</li>
+      </ul>`,
+    src: "Zhang et al. — mixup; Yun et al. — CutMix",
+    url: "https://arxiv.org/abs/1710.09412"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is stochastic depth (DropPath), and how does it differ from dropout?",
+    body: `
+      <ul class="points">
+        <li>Randomly drops <em>entire residual branches</em> during training &mdash; the block passes through as identity with probability p<sub>drop</sub>.</li>
+        <li>Different from dropout, which zeros individual activations. Stochastic depth removes whole subnetworks.</li>
+        <li>Trains what is effectively an ensemble of many shallower networks; reduces effective depth and mitigates gradient vanishing.</li>
+        <li>Standard in ResNet-1001, Vision Transformer, and ConvNeXt (usually a linearly increasing drop rate from 0 at the input to ~0.2 at the output).</li>
+      </ul>`,
+    src: "Huang et al. — Deep Networks with Stochastic Depth",
+    url: "https://arxiv.org/abs/1603.09382"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is the double-descent phenomenon in deep learning?",
+    body: `
+      <p class="answer">The classical bias&ndash;variance curve says test error rises past the interpolation point (once the model fits training data perfectly, it overfits). Empirically for many deep nets it <em>drops again</em> beyond that point.</p>
+      <ul class="points">
+        <li>Two axes: <strong>model-wise</strong> double descent (fix data, grow model) and <strong>sample-wise</strong> (fix model, grow data). Both show a peak around the interpolation threshold.</li>
+        <li>Overparameterized models can generalize because SGD's <strong>implicit bias</strong> selects a low-norm interpolating solution among the many that fit the data.</li>
+        <li>Explains why modern LLMs and vision models keep improving beyond zero training loss &mdash; they're on the far side of the second descent.</li>
+      </ul>`,
+    src: "Nakkiran et al. — Deep Double Descent",
+    url: "https://arxiv.org/abs/1912.02292"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is focal loss, and when should you use it?",
+    body: `
+      <p class="answer">Standard cross-entropy weights all examples equally. Focal loss downweights easy examples so training focuses on the hard ones:</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>FL</mtext><mo>(</mo><msub><mi>p</mi><mi>t</mi></msub><mo>)</mo>
+          <mo>=</mo>
+          <mo>&#x2212;</mo>
+          <msup><mrow><mo>(</mo><mn>1</mn><mo>&#x2212;</mo><msub><mi>p</mi><mi>t</mi></msub><mo>)</mo></mrow><mi>&#x03B3;</mi></msup>
+          <mi>log</mi><mo>(</mo><msub><mi>p</mi><mi>t</mi></msub><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>p<sub>t</sub> = probability of the correct class. The (1&#x2212;p<sub>t</sub>)<sup>&#x03B3;</sup> factor vanishes for confident predictions.</li>
+        <li>Designed for <strong>dense object detection</strong> (RetinaNet), where anchor sampling produces ~10&sup3; negatives per positive.</li>
+        <li>Also useful for general severe class imbalance; complements or replaces weighted sampling.</li>
+        <li>&#x03B3; = 0 recovers cross-entropy; &#x03B3; = 2 is the default.</li>
+      </ul>`,
+    src: "Lin et al. — Focal Loss for Dense Object Detection",
+    url: "https://arxiv.org/abs/1708.02002"
+  },
+  {
+    cat: "Deep Learning",
+    q: "Write the InfoNCE loss. Why is it central to contrastive self-supervised learning?",
+    body: `
+      <p class="answer">Given an anchor x with positive x<sup>+</sup> and K negatives:</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>&#x2112;</mi><mtext>NCE</mtext></msub>
+          <mo>=</mo>
+          <mo>&#x2212;</mo>
+          <mi>log</mi>
+          <mfrac>
+            <mrow><mi>exp</mi><mo>(</mo><mi>sim</mi><mo>(</mo><mi>x</mi><mo>,</mo><msup><mi>x</mi><mo>+</mo></msup><mo>)</mo><mo>/</mo><mi>&#x03C4;</mi><mo>)</mo></mrow>
+            <mrow>
+              <munderover><mo>&#x2211;</mo><mrow><mi>k</mi><mo>=</mo><mn>0</mn></mrow><mi>K</mi></munderover>
+              <mi>exp</mi><mo>(</mo><mi>sim</mi><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>x</mi><mi>k</mi></msub><mo>)</mo><mo>/</mo><mi>&#x03C4;</mi><mo>)</mo>
+            </mrow>
+          </mfrac>
+        </math>
+      </div>
+      <ul class="points">
+        <li>A softmax classifier where the positive is one of K+1 candidates; forces the anchor's embedding close to its positive and far from negatives.</li>
+        <li>A lower bound on the mutual information between the two views (Oord et al.). Maximizing InfoNCE approximately maximizes I(x; x<sup>+</sup>).</li>
+        <li>&#x03C4; is a temperature that controls how peaky the softmax is; low &#x03C4; makes the loss focus on hardest negatives.</li>
+        <li>Foundational to SimCLR, MoCo, CLIP, and most modern multimodal embedding models.</li>
+      </ul>`,
+    src: "van den Oord et al. — Representation Learning with Contrastive Predictive Coding",
+    url: "https://arxiv.org/abs/1807.03748"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What inductive biases do CNNs have that Transformers lack, and when does that matter?",
+    body: `
+      <ul class="points">
+        <li><strong>Locality</strong> &mdash; each conv kernel sees a small neighborhood; the receptive field grows layer by layer. Transformers see everything from layer 1.</li>
+        <li><strong>Translation equivariance</strong> &mdash; convolving with the same kernel everywhere means a shifted input produces a shifted output (up to boundary effects).</li>
+        <li><strong>Weight sharing</strong> &mdash; drastically reduces parameters and imposes the prior that features useful in one location are useful in another.</li>
+      </ul>
+      <p class="answer">These biases make CNNs data-efficient on small vision datasets. Transformers need far more data (or heavy augmentation, or self-supervised pretraining) to <em>learn</em> those biases from scratch &mdash; and once they do, they scale better, which is why ViT beats CNNs at ImageNet-scale and above.</p>`,
+    src: "Dosovitskiy et al. — An Image is Worth 16x16 Words (ViT)",
+    url: "https://arxiv.org/abs/2010.11929"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What are depthwise separable convolutions, and why did MobileNet use them?",
+    body: `
+      <p class="answer">Factor a standard k&times;k&times;C convolution into two cheaper operations:</p>
+      <ul class="points">
+        <li><strong>Depthwise conv</strong> &mdash; one k&times;k filter per input channel, applied independently (no cross-channel mixing).</li>
+        <li><strong>Pointwise conv</strong> &mdash; a 1&times;1 conv that mixes channels.</li>
+      </ul>
+      <p class="answer">FLOP reduction from k&sup2;&sdot;C&sdot;C to k&sup2;&sdot;C + C&sdot;C &mdash; roughly 8&ndash;9&times; savings for a typical 3&times;3, 512-channel conv. Accuracy drop is small.</p>
+      <p class="answer">Modern reincarnations: ConvNeXt uses depthwise 7&times;7 convs to build a "Transformer-like" ConvNet, and EfficientNet stacks inverted-residual blocks (MBConv) as its core building unit.</p>`,
+    src: "Howard et al. — MobileNets",
+    url: "https://arxiv.org/abs/1704.04861"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What are Squeeze-and-Excitation (SE) blocks, and why do they help?",
+    body: `
+      <p class="answer">A tiny channel-wise attention mechanism inserted after a conv block:</p>
+      <ul class="points">
+        <li><strong>Squeeze</strong> &mdash; global average pool across spatial dims &rarr; one scalar per channel.</li>
+        <li><strong>Excitation</strong> &mdash; two-layer MLP with sigmoid produces per-channel gating weights.</li>
+        <li>Multiply the feature map by the gates &mdash; the network learns which channels to emphasize per-example.</li>
+      </ul>
+      <p class="answer">Tiny compute overhead, ~1% ImageNet accuracy boost. First-place ImageNet 2017 (SENet). The same gating idea reappears in Transformers as gated MLPs (SwiGLU, GeGLU).</p>`,
+    src: "Hu et al. — Squeeze-and-Excitation Networks",
+    url: "https://arxiv.org/abs/1709.01507"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is a U-Net, and why is it the go-to for dense prediction?",
+    body: `
+      <p class="answer">Encoder&ndash;decoder CNN with <strong>skip connections</strong> from each encoder level to the matching decoder level. Encoder downsamples for context; decoder upsamples back to input resolution; skips preserve fine detail lost by pooling.</p>
+      <ul class="points">
+        <li>Original use: biomedical segmentation with tiny datasets.</li>
+        <li>Skip connections give the decoder access to high-res features, essential for pixel-accurate outputs.</li>
+        <li>Same topology powers image-to-image translation (pix2pix), depth estimation, and the noise-prediction net inside every diffusion model.</li>
+      </ul>`,
+    src: "Ronneberger et al. — U-Net",
+    url: "https://arxiv.org/abs/1505.04597"
+  },
+  {
+    cat: "Deep Learning",
+    q: "Contrast LSTM and GRU. When would you pick one over the other?",
+    body: `
+      <ul class="points">
+        <li><strong>LSTM</strong> &mdash; three gates (input, forget, output) and a separate cell state. Four weight matrices per unit.</li>
+        <li><strong>GRU</strong> &mdash; two gates (update, reset); merges cell and hidden state. Three weight matrices &mdash; ~25% fewer parameters.</li>
+        <li>Empirically comparable on most tasks; GRU trains slightly faster and does well on small datasets, LSTM has a small edge on very long dependencies.</li>
+        <li>Both largely superseded by Transformers for sequence modeling, but still relevant on edge devices (small memory footprint) and streaming inference (constant per-token cost).</li>
+      </ul>`,
+    src: "Cho et al. — GRU; Hochreiter & Schmidhuber — LSTM",
+    url: "https://arxiv.org/abs/1406.1078"
+  },
+  {
+    cat: "Deep Learning",
+    q: "How does a Vision Transformer (ViT) turn images into tokens? What's the CLS token for?",
+    body: `
+      <ul class="points">
+        <li>Split image into non-overlapping patches (e.g. 16&times;16). Flatten each to a vector.</li>
+        <li>Linearly project each patch to the model dim &mdash; the "patch embedding".</li>
+        <li>Add learned positional embeddings (or 2D sincos, or RoPE-2D in later variants).</li>
+        <li>Prepend a learnable <strong>[CLS] token</strong>. Its final-layer representation is used for classification.</li>
+        <li>Run through a standard Transformer encoder stack; the [CLS] token attends to every patch and vice versa, aggregating global information.</li>
+      </ul>
+      <p class="answer">ViT needs large-scale pretraining (JFT-300M) to compete with CNNs on ImageNet; with less data, its lack of locality bias hurts. DeiT (Touvron et al.) showed strong data augmentation + distillation close that gap.</p>`,
+    src: "Dosovitskiy et al. — An Image is Worth 16x16 Words (ViT)",
+    url: "https://arxiv.org/abs/2010.11929"
+  },
+  {
+    cat: "Deep Learning",
+    q: "How do diffusion models work? Explain the forward and reverse processes.",
+    body: `
+      <p class="answer"><strong>Forward process</strong>: gradually add Gaussian noise over T steps until the data is pure noise.</p>
+      <div class="eq">
+        <math display="block">
+          <mi>q</mi><mo>(</mo><msub><mi>x</mi><mi>t</mi></msub><mo>|</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo>
+          <mo>=</mo>
+          <mi>&#x1D4A9;</mi><mo>(</mo>
+          <msqrt><msub><mover><mi>&#x03B1;</mi><mo>&#x00AF;</mo></mover><mi>t</mi></msub></msqrt>
+          <msub><mi>x</mi><mn>0</mn></msub>
+          <mo>,</mo>
+          <mo>(</mo><mn>1</mn><mo>&#x2212;</mo><msub><mover><mi>&#x03B1;</mi><mo>&#x00AF;</mo></mover><mi>t</mi></msub><mo>)</mo><mi>I</mi>
+          <mo>)</mo>
+        </math>
+      </div>
+      <p class="answer"><strong>Reverse process</strong>: a network &#x03B5;<sub>&#x03B8;</sub>(x<sub>t</sub>, t) is trained to predict the noise added at each step. At sample time, iterate t = T &rarr; 0, subtracting predicted noise (plus a small stochastic term) at each step.</p>
+      <ul class="points">
+        <li>Training loss is simply MSE between predicted and actual noise &mdash; incredibly stable, unlike GANs.</li>
+        <li>Score-based view: &#x03B5;<sub>&#x03B8;</sub> is proportional to &#x2207; log p<sub>t</sub>(x) &mdash; the score of the noised distribution.</li>
+        <li>Slow sampling (many steps) is the main drawback; DDIM, consistency models, and few-step distillation compress inference.</li>
+      </ul>`,
+    src: "Ho et al. — Denoising Diffusion Probabilistic Models",
+    url: "https://arxiv.org/abs/2006.11239"
+  },
+  {
+    cat: "Deep Learning",
+    q: "Derive the ELBO for a VAE. Why is the reparameterization trick necessary?",
+    body: `
+      <p class="answer">A VAE learns an encoder q(z|x) and a decoder p(x|z) by maximizing the <strong>Evidence Lower Bound</strong>:</p>
+      <div class="eq">
+        <math display="block">
+          <mi>log</mi><mi>p</mi><mo>(</mo><mi>x</mi><mo>)</mo>
+          <mo>&#x2265;</mo>
+          <msub><mi>&#x1D53C;</mi><mrow><mi>z</mi><mo>~</mo><mi>q</mi></mrow></msub>
+          <mo>[</mo><mi>log</mi><mi>p</mi><mo>(</mo><mi>x</mi><mo>|</mo><mi>z</mi><mo>)</mo><mo>]</mo>
+          <mo>&#x2212;</mo>
+          <mtext>KL</mtext><mo>(</mo><mi>q</mi><mo>(</mo><mi>z</mi><mo>|</mo><mi>x</mi><mo>)</mo>
+          <mo>&#x2016;</mo>
+          <mi>p</mi><mo>(</mo><mi>z</mi><mo>)</mo><mo>)</mo>
+        </math>
+      </div>
+      <p class="answer">Reconstruction likelihood plus KL to the prior. But z is sampled from q &mdash; a stochastic operation not differentiable through parameters. The <strong>reparameterization trick</strong> rewrites z = &#x03BC; + &#x03C3; &#x2299; &#x03B5; with &#x03B5; ~ &#x1D4A9;(0, I), moving the randomness outside &#x03B8;. Gradients flow through &#x03BC; and &#x03C3;.</p>
+      <ul class="points">
+        <li>&#x03B2;-VAE (Higgins et al.) adds a coefficient on the KL &mdash; &#x03B2; &gt; 1 encourages disentangled latents.</li>
+        <li>Posterior collapse: if q(z|x) matches p(z), the decoder ignores z. Common in text VAEs; mitigated by KL annealing or free bits.</li>
+      </ul>`,
+    src: "Kingma & Welling — Auto-Encoding Variational Bayes",
+    url: "https://arxiv.org/abs/1312.6114"
+  },
+  {
+    cat: "Deep Learning",
+    q: "Why is GAN training unstable, and what is mode collapse?",
+    body: `
+      <p class="answer">The GAN objective is a min&ndash;max game &mdash; a saddle point, not a minimum:</p>
+      <div class="eq">
+        <math display="block">
+          <munder><mi>min</mi><mi>G</mi></munder>
+          <munder><mi>max</mi><mi>D</mi></munder>
+          <msub><mi>&#x1D53C;</mi><mrow><mi>x</mi><mo>~</mo><msub><mi>p</mi><mtext>data</mtext></msub></mrow></msub>
+          <mo>[</mo><mi>log</mi><mi>D</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>]</mo>
+          <mo>+</mo>
+          <msub><mi>&#x1D53C;</mi><mrow><mi>z</mi><mo>~</mo><msub><mi>p</mi><mi>z</mi></msub></mrow></msub>
+          <mo>[</mo><mi>log</mi><mo>(</mo><mn>1</mn><mo>&#x2212;</mo><mi>D</mi><mo>(</mo><mi>G</mi><mo>(</mo><mi>z</mi><mo>)</mo><mo>)</mo><mo>)</mo><mo>]</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Standard SGD on a min-max problem doesn't converge in general &mdash; the optimum can be a cycle.</li>
+        <li><strong>Mode collapse</strong>: G learns to produce a single output that fools D, so it stops covering the data distribution. Common when D overpowers G.</li>
+        <li>Mitigations: Wasserstein GAN + gradient penalty (WGAN-GP), spectral normalization, feature matching, minibatch discrimination, two-timescale updates (TTUR).</li>
+        <li>Diffusion models sidestep the problem entirely by using a stable MSE regression objective.</li>
+      </ul>`,
+    src: "Goodfellow et al. — GAN; Arjovsky et al. — Wasserstein GAN",
+    url: "https://arxiv.org/abs/1701.07875"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is knowledge distillation? Why do soft labels help more than hard labels?",
+    body: `
+      <p class="answer">Train a small "student" to match the soft output distribution of a large "teacher", with softmax temperature T &gt; 1:</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>&#x2112;</mi><mtext>KD</mtext></msub>
+          <mo>=</mo>
+          <mi>&#x03B1;</mi><mo>&#x22C5;</mo><mtext>KL</mtext><mo>(</mo>
+          <msub><mi>p</mi><mi>T</mi></msub><mo>&#x2016;</mo><msub><mi>p</mi><mi>S</mi></msub>
+          <mo>)</mo>
+          <mo>+</mo>
+          <mo>(</mo><mn>1</mn><mo>&#x2212;</mo><mi>&#x03B1;</mi><mo>)</mo>
+          <mo>&#x22C5;</mo><mtext>CE</mtext><mo>(</mo><mi>y</mi><mo>,</mo><msub><mi>p</mi><mi>S</mi></msub><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>Dark knowledge</strong>: the teacher's relative probabilities across incorrect classes ("this MNIST 3 also looks a bit like an 8") encode similarity structure that hard labels erase.</li>
+        <li>High T softens the distribution and makes those relative probabilities matter to the loss.</li>
+        <li>Student often matches teacher accuracy at &lt; 20% of the parameters (DistilBERT, TinyBERT, Distil-Whisper).</li>
+      </ul>`,
+    src: "Hinton et al. — Distilling the Knowledge in a Neural Network",
+    url: "https://arxiv.org/abs/1503.02531"
+  },
+  {
+    cat: "Deep Learning",
+    q: "Feature extraction vs full fine-tuning vs adapters — when do you use each?",
+    body: `
+      <ul class="points">
+        <li><strong>Feature extraction</strong> &mdash; freeze the pretrained backbone, train only a new head. Fast, no risk of forgetting, but caps quality when domain differs from pretraining.</li>
+        <li><strong>Full fine-tuning</strong> &mdash; update all weights. Highest quality when you have enough data. Risks catastrophic forgetting; needs a much smaller LR than pretraining.</li>
+        <li><strong>Adapters / PEFT</strong> &mdash; insert small trainable modules (bottleneck MLPs, LoRA, BitFit, prompt tuning) while keeping the base frozen. &lt; 1% trainable params, minimal storage per task, near-full-fine-tune quality.</li>
+      </ul>
+      <p class="answer">Rule of thumb: adapters when serving many downstream tasks from one base model, full fine-tune when you have plenty of task data and quality is paramount, feature-extract only when compute-constrained.</p>`,
+    src: "Houlsby et al. — Parameter-Efficient Transfer Learning for NLP",
+    url: "https://arxiv.org/abs/1902.00751"
+  },
+  {
+    cat: "Deep Learning",
+    q: "How does SimCLR do contrastive self-supervised learning on images?",
+    body: `
+      <ul class="points">
+        <li>Two random augmentations of the same image form a <strong>positive pair</strong>; other images in the batch are negatives.</li>
+        <li>Encoder + a small projection head produce embeddings; NT-Xent (a scaled InfoNCE) is the loss.</li>
+        <li>Big batches (~4096) are essential &mdash; the batch <em>is</em> the negative pool.</li>
+        <li>Strong augmentation (crop + color jitter + Gaussian blur) is the single biggest lever &mdash; SimCLR's trick is teaching the encoder to be augmentation-invariant.</li>
+        <li>Discard the projection head at downstream time; encoder features generalize better than projection outputs.</li>
+      </ul>
+      <p class="answer">Follow-ups: MoCo (queue of negatives to decouple pool size from batch size), BYOL (no negatives at all &mdash; a target network), DINO (self-distillation with ViT).</p>`,
+    src: "Chen et al. — A Simple Framework for Contrastive Learning of Visual Representations (SimCLR)",
+    url: "https://arxiv.org/abs/2002.05709"
+  },
+  {
+    cat: "Deep Learning",
+    q: "How does the Masked Autoencoder (MAE) do self-supervised learning, and how does it differ from BERT-style masking?",
+    body: `
+      <ul class="points">
+        <li>Mask a very high fraction (~75%) of image patches; feed only the visible ones through a heavy encoder.</li>
+        <li>A lightweight decoder reconstructs the masked pixels from the encoder output + learnable mask tokens.</li>
+        <li>Loss: MSE on the masked-patch pixels only.</li>
+      </ul>
+      <ul class="points">
+        <li>Very different from BERT's 15% masking. Images are much more redundant than text &mdash; you need aggressive masking to make the task hard enough to teach useful features.</li>
+        <li>Because the encoder only sees ~25% of patches, training is fast despite the huge model.</li>
+        <li>The learned encoder transfers very well; usually beats contrastive methods on dense prediction.</li>
+      </ul>`,
+    src: "He et al. — Masked Autoencoders Are Scalable Vision Learners",
+    url: "https://arxiv.org/abs/2111.06377"
+  },
+  {
+    cat: "Deep Learning",
+    q: "Compare adapter methods for parameter-efficient fine-tuning.",
+    body: `
+      <ul class="points">
+        <li><strong>Adapters</strong> (Houlsby) &mdash; two-layer bottleneck MLPs inserted after attention and FFN. Trainable ~0.5&ndash;5% of params. Small inference overhead.</li>
+        <li><strong>LoRA</strong> &mdash; low-rank &#x0394;W = BA added to specific linear layers. Zero inference overhead if merged into W. Standard for LLM fine-tuning.</li>
+        <li><strong>BitFit</strong> &mdash; only update biases. Trivially small (~0.1% of params). Surprisingly competitive on GLUE-scale tasks.</li>
+        <li><strong>Prompt tuning</strong> &mdash; freeze the model, learn a short sequence of continuous "soft prompt" vectors prepended to input. Trainable params = length &times; d<sub>model</sub>.</li>
+      </ul>
+      <p class="answer">All target the same problem: full fine-tuning is expensive to store per task. Adapters compose well (many tasks, one deployment); prompt tuning is smallest but plateaus below full fine-tune on hard tasks.</p>`,
+    src: "Houlsby et al. — Adapter; Ben Zaken et al. — BitFit; Lester et al. — Prompt Tuning",
+    url: "https://arxiv.org/abs/2104.08691"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is Model-Agnostic Meta-Learning (MAML)?",
+    body: `
+      <p class="answer">Meta-learn an initialization &#x03B8; such that a few gradient steps on a new task's small training set produce a good task-specific model.</p>
+      <div class="eq">
+        <math display="block">
+          <munder><mi>min</mi><mi>&#x03B8;</mi></munder>
+          <munder><mo>&#x2211;</mo><mi>&#x03C4;</mi></munder>
+          <msub><mi>L</mi><mi>&#x03C4;</mi></msub><mo>(</mo>
+          <mi>&#x03B8;</mi><mo>&#x2212;</mo><mi>&#x03B1;</mi><mo>&#x2207;</mo><msub><mi>L</mi><mi>&#x03C4;</mi></msub><mo>(</mo><mi>&#x03B8;</mi><mo>)</mo>
+          <mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Outer loop: gradient descent on &#x03B8; through the inner task-specific update.</li>
+        <li>Requires second-order derivatives; first-order approximations (FOMAML, Reptile) work almost as well at a fraction of the cost.</li>
+        <li>Powerful on few-shot classification benchmarks (Omniglot, Mini-ImageNet), but largely superseded by "pretrain a big model + in-context/prompt-based few-shot".</li>
+      </ul>`,
+    src: "Finn et al. — Model-Agnostic Meta-Learning",
+    url: "https://arxiv.org/abs/1703.03400"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is the Neural Tangent Kernel (NTK), and what does it tell us about wide networks?",
+    body: `
+      <p class="answer">In the limit of infinite width, a neural network's training dynamics under gradient descent become equivalent to <strong>kernel regression</strong> with a fixed kernel &mdash; the NTK &mdash; determined only by the architecture and initialization.</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>NTK</mtext><mo>(</mo><mi>x</mi><mo>,</mo><msup><mi>x</mi><mo>&#x2032;</mo></msup><mo>)</mo>
+          <mo>=</mo>
+          <msub><mo>&#x2207;</mo><mi>&#x03B8;</mi></msub>
+          <mi>f</mi><mo>(</mo><mi>x</mi><mo>;</mo><mi>&#x03B8;</mi><mo>)</mo>
+          <mo>&#x22C5;</mo>
+          <msub><mo>&#x2207;</mo><mi>&#x03B8;</mi></msub>
+          <mi>f</mi><mo>(</mo><msup><mi>x</mi><mo>&#x2032;</mo></msup><mo>;</mo><mi>&#x03B8;</mi><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Provides a theoretical handle on why wide nets generalize despite overparameterization: they're kernel machines with a specific inductive bias.</li>
+        <li>Real finite-width networks depart from the NTK regime &mdash; features actually get learned, not just weighted. The gap between the two regimes is where deep learning does its real work.</li>
+      </ul>`,
+    src: "Jacot et al. — Neural Tangent Kernel",
+    url: "https://arxiv.org/abs/1806.07572"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What are flat vs sharp minima, and why do we think flatness matters for generalization?",
+    body: `
+      <ul class="points">
+        <li><strong>Flat minimum</strong>: loss stays low in a wide neighborhood of &#x03B8;. <strong>Sharp minimum</strong>: loss rises steeply around &#x03B8;.</li>
+        <li>Intuition: flat minima are robust to weight perturbation, which is closely related to test-time perturbations (e.g. distribution shift, quantization).</li>
+        <li>Empirically, small-batch SGD finds flatter minima than large-batch SGD (Keskar et al.); explains why generalization drops when you naively scale up batch size.</li>
+        <li>SAM (Sharpness-Aware Minimization) explicitly targets flat minima and improves generalization.</li>
+        <li>Caveat: "flatness" depends on parameterization &mdash; a reparameterization can make any minimum look sharp. Works in practice but is theoretically slippery.</li>
+      </ul>`,
+    src: "Keskar et al. — On Large-Batch Training for Deep Learning",
+    url: "https://arxiv.org/abs/1609.04836"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is perceptual (VGG) loss, and why use it for image generation instead of L2?",
+    body: `
+      <ul class="points">
+        <li>Instead of comparing pixel values, extract features from a pretrained network (usually early VGG layers) and compute MSE on those features.</li>
+        <li>Pixel L2 penalizes any deviation equally and correlates poorly with human judgments &mdash; it produces blurry outputs because the mean of plausible outputs is blurry.</li>
+        <li>Perceptual loss ignores per-pixel noise but preserves textures, edges, and semantic structure that VGG features encode.</li>
+        <li>Standard for super-resolution, style transfer, image translation, and diffusion decoder training.</li>
+        <li>Often combined with adversarial losses (SRGAN, pix2pix) for sharper output.</li>
+      </ul>`,
+    src: "Johnson et al. — Perceptual Losses for Real-Time Style Transfer and Super-Resolution",
+    url: "https://arxiv.org/abs/1603.08155"
+  },
+  {
+    cat: "Deep Learning",
+    q: "You have a 1:1000 class imbalance. What strategies actually work?",
+    body: `
+      <ul class="points">
+        <li><strong>Resampling</strong> &mdash; oversample the minority (with replacement or SMOTE) or undersample the majority. Cheap but risks overfitting to duplicated minority examples.</li>
+        <li><strong>Class-weighted loss</strong> &mdash; multiply per-example loss by 1/frequency (or the effective-number-of-samples version, Cui et al.).</li>
+        <li><strong>Focal loss</strong> &mdash; downweight easy examples so training focuses on hard minority instances.</li>
+        <li><strong>Two-stage training</strong> &mdash; pretrain on natural distribution, then fine-tune the classifier head with balanced sampling (better calibrated).</li>
+        <li><strong>Threshold tuning</strong> &mdash; don't change training at all; pick the classification threshold that maximizes your target metric on validation.</li>
+      </ul>
+      <p class="answer">For severely imbalanced problems, the metric matters more than the training trick &mdash; accuracy is useless. Optimize precision/recall/AUPRC and tune the threshold on validation.</p>`,
+    src: "Cui et al. — Class-Balanced Loss Based on Effective Number of Samples",
+    url: "https://arxiv.org/abs/1901.05555"
+  },
+  {
+    cat: "Deep Learning",
+    q: "What is test-time augmentation (TTA), and when is the trade-off worth it?",
+    body: `
+      <ul class="points">
+        <li>At inference, run the model on several augmented versions of the input (crops, flips, rotations) and average the predictions.</li>
+        <li>Reduces prediction variance the same way ensembling does &mdash; but with only one model.</li>
+        <li>Gains: typically 0.5&ndash;1.5% ImageNet-scale accuracy for ~5&times; inference cost.</li>
+        <li>Ubiquitous in Kaggle-style competitions; rare in production because of the cost.</li>
+      </ul>`,
+    src: "Krizhevsky et al. — ImageNet Classification with Deep CNNs (10-crop testing, §4.1)",
+    url: "https://papers.nips.cc/paper/2012/hash/c399862d3b9d6b76c8436e924a68c45b-Abstract.html"
+  },
+  {
+    cat: "Deep Learning",
+    q: "How do you measure and fix miscalibration in deep classifiers?",
+    body: `
+      <p class="answer">A calibrated model's predicted probabilities match empirical accuracy: if it says "70% confident", it's right 70% of the time. Modern deep nets are almost always <strong>overconfident</strong> (Guo et al., 2017).</p>
+      <p class="answer"><strong>Expected Calibration Error</strong>:</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>ECE</mtext>
+          <mo>=</mo>
+          <munderover><mo>&#x2211;</mo><mrow><mi>m</mi><mo>=</mo><mn>1</mn></mrow><mi>M</mi></munderover>
+          <mfrac><mrow><mo>|</mo><msub><mi>B</mi><mi>m</mi></msub><mo>|</mo></mrow><mi>N</mi></mfrac>
+          <mo>|</mo><mtext>acc</mtext><mo>(</mo><msub><mi>B</mi><mi>m</mi></msub><mo>)</mo><mo>&#x2212;</mo><mtext>conf</mtext><mo>(</mo><msub><mi>B</mi><mi>m</mi></msub><mo>)</mo><mo>|</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>Temperature scaling</strong> &mdash; divide logits by a scalar T &gt; 1 tuned on validation; softmax gets less peaky. Doesn't change predictions, cuts ECE by ~10&times;.</li>
+        <li>Label smoothing during training also helps a lot.</li>
+        <li>Deep ensembles and MC dropout give both calibration and epistemic uncertainty at higher cost.</li>
+      </ul>`,
+    src: "Guo et al. — On Calibration of Modern Neural Networks",
+    url: "https://arxiv.org/abs/1706.04599"
+  },
+  {
+    cat: "Deep Learning",
+    q: "Why does large-batch training hurt generalization, and what are the standard fixes?",
+    body: `
+      <ul class="points">
+        <li>Small-batch SGD has gradient noise that biases toward wide, flat minima &mdash; better test error (Keskar et al.). Large batches lower this noise and converge to sharper minima.</li>
+        <li>SGD noise scale &prop; LR / batch size. Hence the <strong>linear scaling rule</strong> (Goyal et al.): multiply batch size by k, multiply LR by k.</li>
+        <li>Very large batches need <strong>warmup</strong> (LR ramps up slowly) to survive the noisy initial steps.</li>
+        <li><strong>LARS / LAMB</strong> &mdash; layer-wise adaptive LR based on the ratio &#x2016;W&#x2016; / &#x2016;&#x2207;W&#x2016;. Enables ImageNet in ~1 hour and BERT training at 32k batch size.</li>
+        <li>Beyond a critical batch size, further scaling gives diminishing returns &mdash; more compute for the same test error.</li>
+      </ul>`,
+    src: "Goyal et al. — Accurate, Large Minibatch SGD; McCandlish et al. — An Empirical Model of Large-Batch Training",
+    url: "https://arxiv.org/abs/1706.02677"
+  },
 
   /* ===================== TRANSFORMERS & LLMs ===================== */
   {
