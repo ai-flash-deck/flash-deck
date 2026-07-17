@@ -471,6 +471,595 @@ const CARDS = [
     src: "scikit-learn — Model evaluation guide",
     url: "https://scikit-learn.org/stable/modules/model_evaluation.html"
   },
+  {
+    cat: "ML Foundations",
+    q: "Supervised, unsupervised, semi-supervised, self-supervised — what are the differences?",
+    body: `
+      <ul class="points">
+        <li><strong>Supervised</strong> &mdash; labels come with every example (classification, regression).</li>
+        <li><strong>Unsupervised</strong> &mdash; no labels; find structure (clustering, density estimation, dimensionality reduction).</li>
+        <li><strong>Semi-supervised</strong> &mdash; small labeled set + big unlabeled set; use unlabeled data to shape the decision boundary (pseudo-labeling, MixMatch).</li>
+        <li><strong>Self-supervised</strong> &mdash; construct labels <em>from</em> the data (predict a masked patch, predict the next token). Modern foundation models are trained this way, then fine-tuned supervised for downstream tasks.</li>
+      </ul>`,
+    src: "Hastie, Tibshirani & Friedman — Elements of Statistical Learning (Ch. 1)",
+    url: "https://hastie.su.domains/ElemStatLearn/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "How do you diagnose whether a model is overfitting or underfitting?",
+    body: `
+      <ul class="points">
+        <li><strong>High train, high val error</strong> &rarr; underfitting. Model too simple, features too weak, or trained too briefly.</li>
+        <li><strong>Low train, high val error</strong> &rarr; overfitting. Add regularization, get more data, reduce capacity, or use stronger augmentation.</li>
+        <li><strong>Low train, low val error</strong> &rarr; well-fit.</li>
+      </ul>
+      <p class="answer">Plot <strong>learning curves</strong> (error vs training-set size) to distinguish: a shrinking train&ndash;val gap as data grows suggests overfitting; a stubborn plateau at high error suggests underfitting.</p>`,
+    src: "Ng — Machine Learning Yearning (Ch. 20–27)",
+    url: "https://www.deeplearning.ai/machine-learning-yearning/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Why train/val/test rather than just train/test? What's a common pitfall?",
+    body: `
+      <ul class="points">
+        <li><strong>Train</strong> fits parameters. <strong>Val</strong> selects hyperparameters and model architecture. <strong>Test</strong> gives an honest estimate of generalization on truly unseen data.</li>
+        <li>If you tune on the test set (even indirectly, over many attempts), test performance becomes optimistically biased &mdash; the test set has been used as a validation set.</li>
+        <li>Common pitfall: <strong>data leakage</strong> across splits &mdash; the same user, patient, or timestamp appears in multiple splits, so the test set isn't truly out-of-sample.</li>
+      </ul>`,
+    src: "Ng — Machine Learning Yearning",
+    url: "https://www.deeplearning.ai/machine-learning-yearning/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What is k-fold cross-validation, and when is it worth the compute?",
+    body: `
+      <p class="answer">Split the training data into k folds. For each fold, train on the other k&minus;1 folds and evaluate on the held-out one; average the k scores.</p>
+      <ul class="points">
+        <li>Uses every example for both training and evaluation &mdash; much lower variance in the score than a single val split.</li>
+        <li>Worth it on <strong>small datasets</strong> (say &lt; 10k examples), where a single val split is too noisy for reliable model selection.</li>
+        <li>For very large datasets or expensive models, a single big val split is fine and k-fold isn't worth k&times; the training cost.</li>
+        <li><strong>Stratified</strong> k-fold preserves the class ratio in each fold &mdash; important for imbalanced classification.</li>
+      </ul>`,
+    src: "scikit-learn — Cross-validation guide",
+    url: "https://scikit-learn.org/stable/modules/cross_validation.html"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What is the curse of dimensionality, and how does it affect ML?",
+    body: `
+      <ul class="points">
+        <li>In high dimensions, all points become roughly equidistant &mdash; distance-based methods (k-NN, k-means) degenerate.</li>
+        <li>Volume grows exponentially; the amount of data needed to cover the input space grows with it. Density estimation becomes infeasible.</li>
+        <li>Real data usually lies on a low-dimensional manifold inside the ambient space &mdash; the "manifold hypothesis". Representation learning (deep nets, PCA, autoencoders) exists to find that manifold.</li>
+        <li>Practical implications: prefer models with strong inductive biases (CNNs on images, Transformers on sequences) over generic nearest-neighbor methods.</li>
+      </ul>`,
+    src: "Bellman — Adaptive Control Processes (1961); Bishop — PRML (§1.4)",
+    url: "https://en.wikipedia.org/wiki/Curse_of_dimensionality"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Should you standardize, min-max scale, or leave features alone?",
+    body: `
+      <ul class="points">
+        <li><strong>Standardize</strong> (zero mean, unit variance) &mdash; default for linear models, SVMs, logistic regression, neural nets, k-means. Necessary any time gradient descent or distance-based math is involved.</li>
+        <li><strong>Min-max scale</strong> to [0, 1] &mdash; useful when you need bounded inputs (image pixels, some neural layers), or when features have known natural bounds.</li>
+        <li><strong>Leave alone</strong> for tree-based models (decision trees, random forests, gradient boosting) &mdash; they only look at split thresholds, not absolute magnitudes.</li>
+        <li>Fit the scaler on the training set only, then apply to val and test &mdash; otherwise you leak information about the test distribution.</li>
+      </ul>`,
+    src: "scikit-learn — Preprocessing data",
+    url: "https://scikit-learn.org/stable/modules/preprocessing.html"
+  },
+  {
+    cat: "ML Foundations",
+    q: "One-hot encoding vs learned embeddings for categorical features — when do you use each?",
+    body: `
+      <ul class="points">
+        <li><strong>One-hot</strong> &mdash; simple, no learning required, works fine for low-cardinality categoricals (weekday, blood type). Explodes in memory for high-cardinality features.</li>
+        <li><strong>Learned embeddings</strong> &mdash; map each category to a dense vector trained end-to-end. Necessary for high-cardinality (user IDs, product SKUs, tokens). Captures similarity between categories.</li>
+        <li>Rule of thumb: cardinality &lt; ~50 &rarr; one-hot; higher &rarr; embed with dimension ~min(50, &#x221A;cardinality).</li>
+        <li>For tabular ML with GBDTs, target encoding often beats both (see next card).</li>
+      </ul>`,
+    src: "Guo & Berkhahn — Entity Embeddings of Categorical Variables",
+    url: "https://arxiv.org/abs/1604.06737"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What is target (mean) encoding, and what is the leakage risk?",
+    body: `
+      <p class="answer">Replace each category value with the mean of the target for that category in the training set. Turns a high-cardinality categorical into a single numeric feature that captures its predictive signal.</p>
+      <ul class="points">
+        <li>Powerful on tree-based tabular models &mdash; often beats one-hot and learned embeddings on Kaggle-style problems.</li>
+        <li><strong>Leakage risk</strong>: computing the mean on the full training set and then training on it lets the label leak into the feature. Rare categories can be perfectly predicted from their encoded value.</li>
+        <li>Mitigations: <strong>k-fold target encoding</strong> (encode each fold using stats from other folds), <strong>smoothing</strong> toward the global mean for rare categories, adding noise.</li>
+      </ul>`,
+    src: "Micci-Barreca — A Preprocessing Scheme for High-Cardinality Categorical Attributes",
+    url: "https://dl.acm.org/doi/10.1145/507533.507538"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Write the logistic regression model. Why is it "regression" but used for classification?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mi>p</mi><mo>(</mo><mi>y</mi><mo>=</mo><mn>1</mn><mo>|</mo><mi>x</mi><mo>)</mo>
+          <mo>=</mo>
+          <mi>&#x03C3;</mi><mo>(</mo><msup><mi>w</mi><mi>T</mi></msup><mi>x</mi><mo>+</mo><mi>b</mi><mo>)</mo>
+          <mo>,</mo>
+          <mspace width="1em"/>
+          <mi>&#x03C3;</mi><mo>(</mo><mi>z</mi><mo>)</mo><mo>=</mo>
+          <mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo><msup><mi>e</mi><mrow><mo>&#x2212;</mo><mi>z</mi></mrow></msup></mrow></mfrac>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Linear regression on the <strong>log-odds</strong> of the class probability &mdash; the "regression" refers to the linear model in logit space, not the output type.</li>
+        <li>Trained by maximum-likelihood, equivalent to minimizing cross-entropy. Convex loss &rarr; a unique global optimum.</li>
+        <li>Coefficients are directly interpretable: e<sup>w<sub>j</sub></sup> is the odds ratio for a one-unit change in x<sub>j</sub>.</li>
+      </ul>`,
+    src: "Bishop — PRML (§4.3)",
+    url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What is the Naive Bayes assumption, and why does the classifier work well despite it being false?",
+    body: `
+      <p class="answer">Naive Bayes assumes features are <strong>conditionally independent given the class</strong>. This is almost always wrong &mdash; features are correlated.</p>
+      <ul class="points">
+        <li>Yet Naive Bayes classifies well because <strong>ranking the class posteriors correctly</strong> is much easier than estimating them accurately. Correlated features cancel roughly symmetrically across classes.</li>
+        <li>Works especially well on text (bag-of-words with multinomial NB) where the number of features is huge and the true dependencies are weak.</li>
+        <li>Extremely fast to train (closed-form MLE from counts) &mdash; a strong baseline that's still worth beating.</li>
+      </ul>`,
+    src: "Domingos & Pazzani — On the Optimality of the Simple Bayesian Classifier",
+    url: "https://link.springer.com/article/10.1023/A:1007413511361"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What is the max-margin objective of a linear SVM?",
+    body: `
+      <p class="answer">Find the hyperplane that separates classes with the <strong>largest margin</strong>:</p>
+      <div class="eq">
+        <math display="block">
+          <munder><mi>min</mi><mi>w</mi></munder>
+          <mfrac><mn>1</mn><mn>2</mn></mfrac><msup><mrow><mo>&#x2016;</mo><mi>w</mi><mo>&#x2016;</mo></mrow><mn>2</mn></msup>
+          <mo>+</mo>
+          <mi>C</mi>
+          <munder><mo>&#x2211;</mo><mi>i</mi></munder>
+          <mtext>max</mtext><mo>(</mo><mn>0</mn><mo>,</mo>
+          <mn>1</mn><mo>&#x2212;</mo>
+          <msub><mi>y</mi><mi>i</mi></msub><mo>(</mo><msup><mi>w</mi><mi>T</mi></msup><msub><mi>x</mi><mi>i</mi></msub><mo>+</mo><mi>b</mi><mo>)</mo>
+          <mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Margin = 2 / &#x2016;w&#x2016;. Minimizing &#x2016;w&#x2016;<sup>2</sup> maximizes it.</li>
+        <li>Hinge loss enforces &ge; 1 unit of margin for correctly classified points; C trades off margin size vs slack (misclassifications).</li>
+        <li>The optimum depends only on <strong>support vectors</strong> &mdash; points on or inside the margin. Removing all other data doesn't change the model.</li>
+      </ul>`,
+    src: "Cortes & Vapnik — Support-Vector Networks (1995)",
+    url: "https://link.springer.com/article/10.1007/BF00994018"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What is the kernel trick, and what makes a function a valid kernel?",
+    body: `
+      <p class="answer">If an algorithm only accesses data through inner products x<sup>T</sup>y, replace them with a kernel k(x, y) that implicitly computes an inner product in some high-dimensional feature space. You never form the feature map &phi; explicitly.</p>
+      <ul class="points">
+        <li><strong>Mercer's condition</strong>: k is a valid kernel iff its Gram matrix K<sub>ij</sub> = k(x<sub>i</sub>, x<sub>j</sub>) is positive semi-definite for any finite set of points.</li>
+        <li>Common kernels: linear (x&sdot;y), polynomial ((x&sdot;y + 1)<sup>d</sup>), RBF/Gaussian (exp(&minus;&#x03B3;&#x2016;x&minus;y&#x2016;<sup>2</sup>)) &mdash; RBF corresponds to an infinite-dimensional feature space.</li>
+        <li>Enables SVMs, Gaussian processes, and kernel ridge regression to fit highly nonlinear boundaries without explicit feature engineering.</li>
+      </ul>`,
+    src: "Sch&ouml;lkopf & Smola — Learning with Kernels",
+    url: "https://mitpress.mit.edu/9780262536578/learning-with-kernels/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "In decision trees, Gini vs entropy for split criteria — does it matter?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mtext>Gini:&nbsp;</mtext>
+          <mn>1</mn><mo>&#x2212;</mo>
+          <munder><mo>&#x2211;</mo><mi>k</mi></munder>
+          <msubsup><mi>p</mi><mi>k</mi><mn>2</mn></msubsup>
+          <mspace width="2em"/>
+          <mtext>Entropy:&nbsp;</mtext>
+          <mo>&#x2212;</mo>
+          <munder><mo>&#x2211;</mo><mi>k</mi></munder>
+          <msub><mi>p</mi><mi>k</mi></msub><mi>log</mi><msub><mi>p</mi><mi>k</mi></msub>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Both peak at maximum class-uncertainty (uniform distribution) and are 0 for a pure node.</li>
+        <li>Empirically the split choices are nearly identical &mdash; differ only on ~2% of splits.</li>
+        <li>Gini is slightly cheaper (no log), so it's the default in CART and scikit-learn.</li>
+        <li>The real levers on tree quality are max depth, min-samples-per-leaf, and ensembling, not the split criterion.</li>
+      </ul>`,
+    src: "Breiman et al. — CART; Hastie et al. — ESL (§9.2)",
+    url: "https://hastie.su.domains/ElemStatLearn/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Why do Random Forests work? What do bagging and feature subsampling each contribute?",
+    body: `
+      <ul class="points">
+        <li><strong>Bagging</strong> (bootstrap aggregating) &mdash; train each tree on a resampled version of the data. Reduces variance by averaging N noisy but roughly-unbiased trees. Requires trees to be different from each other; deep unpruned trees fit their bootstrap sample tightly, giving high per-tree variance.</li>
+        <li><strong>Feature subsampling</strong> at each split (typically &#x221A;p features considered) &mdash; further <strong>decorrelates</strong> the trees. If one very strong feature exists, without subsampling every tree would use it at the root and they'd all be similar.</li>
+        <li>Result: an ensemble with low bias (deep trees) and low variance (averaging over decorrelated trees) &mdash; often competitive with GBDTs and much less finicky.</li>
+      </ul>`,
+    src: "Breiman — Random Forests (2001)",
+    url: "https://link.springer.com/article/10.1023/A:1010933404324"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What do gradient boosted trees (XGBoost, LightGBM) optimize, and why are they so strong on tabular data?",
+    body: `
+      <p class="answer">A boosted model is a weighted sum of weak learners (shallow trees). Each new tree is fit to the <strong>negative gradient of the loss</strong> at the current predictions &mdash; a functional-space gradient descent.</p>
+      <ul class="points">
+        <li>XGBoost adds a second-order Taylor approximation (uses the Hessian) and explicit L1/L2 regularization on leaf weights.</li>
+        <li>LightGBM adds histogram-based split finding and grow-by-leaf (not by level) for speed.</li>
+        <li>Handle mixed types, missing values, non-monotone interactions, and feature-scale heterogeneity out of the box &mdash; exactly the pain points of tabular data.</li>
+        <li>Still SOTA on many structured-data benchmarks; deep nets on tabular data usually match, not beat, well-tuned GBDTs.</li>
+      </ul>`,
+    src: "Chen & Guestrin — XGBoost; Ke et al. — LightGBM",
+    url: "https://arxiv.org/abs/1603.02754"
+  },
+  {
+    cat: "ML Foundations",
+    q: "How does k-NN work, and what are its main practical limitations?",
+    body: `
+      <ul class="points">
+        <li>At inference, find the k closest training points to the query and return their majority class (or average target).</li>
+        <li>"Lazy learner" &mdash; no training beyond storing the data.</li>
+        <li>Requires a meaningful distance metric; scales badly in high dimensions (curse of dimensionality) unless the data lies on a low-D manifold.</li>
+        <li>Inference is O(N) per query without indexing; approximate NN (FAISS, HNSW) gets you to O(log N).</li>
+        <li>Sensitive to feature scaling &mdash; always standardize first.</li>
+      </ul>`,
+    src: "Cover & Hart — Nearest Neighbor Pattern Classification (1967)",
+    url: "https://ieeexplore.ieee.org/document/1053964"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Describe k-means. What's the objective, and what are its main failure modes?",
+    body: `
+      <p class="answer">Partition points into K clusters minimizing within-cluster sum of squared distances to the cluster mean:</p>
+      <div class="eq">
+        <math display="block">
+          <munder><mi>min</mi><mrow><msub><mi>&#x03BC;</mi><mn>1</mn></msub><mo>,</mo><mo>&#x2026;</mo><mo>,</mo><msub><mi>&#x03BC;</mi><mi>K</mi></msub></mrow></munder>
+          <munderover><mo>&#x2211;</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover>
+          <munder><mo>&#x2211;</mo><mrow><mi>x</mi><mo>&#x2208;</mo><msub><mi>C</mi><mi>k</mi></msub></mrow></munder>
+          <msup><mrow><mo>&#x2016;</mo><mi>x</mi><mo>&#x2212;</mo><msub><mi>&#x03BC;</mi><mi>k</mi></msub><mo>&#x2016;</mo></mrow><mn>2</mn></msup>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Solved by alternating "assign points to nearest centroid" and "recompute centroid means" &mdash; a coordinate descent that always decreases the objective.</li>
+        <li>Non-convex; sensitive to initialization &mdash; use k-means++ to seed centroids.</li>
+        <li>Assumes clusters are roughly <strong>spherical and equally sized</strong>. Fails on elongated, curved, or density-varying clusters &mdash; use DBSCAN or GMMs instead.</li>
+        <li>K must be chosen; elbow, silhouette, or gap statistic help.</li>
+      </ul>`,
+    src: "Arthur & Vassilvitskii — k-means++ (2007)",
+    url: "https://theory.stanford.edu/~sergei/papers/kMeansPP-soda.pdf"
+  },
+  {
+    cat: "ML Foundations",
+    q: "How does the EM algorithm fit a Gaussian Mixture Model, and how is it different from k-means?",
+    body: `
+      <ul class="points">
+        <li><strong>E-step</strong> &mdash; compute soft assignments &#x03B3;<sub>ik</sub> = P(cluster k | x<sub>i</sub>) using current parameters (Bayes).</li>
+        <li><strong>M-step</strong> &mdash; update each cluster's mean, covariance, and mixing weight as the &#x03B3;-weighted maximum-likelihood estimate.</li>
+        <li>Iterate; EM monotonically increases the log-likelihood and converges to a local optimum.</li>
+      </ul>
+      <p class="answer">k-means is EM's <strong>hard-assignment</strong> special case: shared spherical covariance &sigma;<sup>2</sup>I with &sigma; &rarr; 0. GMMs handle elliptical clusters and give a probability of cluster membership rather than a hard label &mdash; useful for anomaly detection and downstream Bayesian modeling.</p>`,
+    src: "Bishop — PRML (Ch. 9)",
+    url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "How does PCA work, and what assumption does it make?",
+    body: `
+      <p class="answer">PCA finds orthogonal directions that maximize projected variance &mdash; equivalently, the eigenvectors of the data covariance matrix (or the right singular vectors of the centered data matrix).</p>
+      <ul class="points">
+        <li>The top-k principal components give the best rank-k linear reconstruction under squared error (Eckart-Young).</li>
+        <li>Assumes the "important" structure in the data is <strong>linear and captured by variance</strong>. Not always true &mdash; a low-variance direction can carry the signal.</li>
+        <li>Sensitive to feature scaling &mdash; always standardize first, or PCA will just find your largest-magnitude feature.</li>
+        <li>Compare with t-SNE / UMAP for nonlinear structure preservation, LDA for supervised projection, and autoencoders when you want a learned nonlinear embedding.</li>
+      </ul>`,
+    src: "Jolliffe & Cadima — Principal Component Analysis: A Review and Recent Developments",
+    url: "https://royalsocietypublishing.org/doi/10.1098/rsta.2015.0202"
+  },
+  {
+    cat: "ML Foundations",
+    q: "When would you use t-SNE, UMAP, or PCA for visualization? What are the gotchas?",
+    body: `
+      <ul class="points">
+        <li><strong>PCA</strong> &mdash; linear, deterministic, fast, preserves global variance structure. Use as a first-pass sanity check.</li>
+        <li><strong>t-SNE</strong> &mdash; nonlinear, preserves <em>local</em> structure well but distorts global distances. Cluster sizes and inter-cluster distances in a t-SNE plot are not reliable.</li>
+        <li><strong>UMAP</strong> &mdash; nonlinear, faster and more scalable than t-SNE, preserves more global structure. Usually the modern default for embedding visualization.</li>
+        <li>Common trap: tuning perplexity/n_neighbors until you see the story you wanted. Both are stochastic and can produce very different-looking plots. Never treat t-SNE/UMAP output as a metric or feature space for downstream ML.</li>
+      </ul>`,
+    src: "McInnes et al. — UMAP; van der Maaten & Hinton — t-SNE",
+    url: "https://arxiv.org/abs/1802.03426"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What does a confusion matrix tell you that accuracy doesn't?",
+    body: `
+      <p class="answer">A K&times;K table where cell (i, j) is the count of examples with true class i predicted as class j. Accuracy is the trace divided by the total.</p>
+      <ul class="points">
+        <li>Reveals <strong>which errors</strong> the model makes &mdash; not just how many. Confusing digit 3 with 8 is different from confusing 3 with 1.</li>
+        <li>Row-normalize to see per-class recall; column-normalize for per-class precision.</li>
+        <li>Under severe imbalance, high accuracy can hide zero recall on the minority class &mdash; only visible in the matrix.</li>
+        <li>Essential for multi-class error analysis and picking the next feature or augmentation to add.</li>
+      </ul>`,
+    src: "scikit-learn — Classification report and confusion matrix",
+    url: "https://scikit-learn.org/stable/modules/model_evaluation.html#confusion-matrix"
+  },
+  {
+    cat: "ML Foundations",
+    q: "When should you use PR-AUC instead of ROC-AUC?",
+    body: `
+      <ul class="points">
+        <li><strong>ROC-AUC</strong> plots TPR vs FPR across thresholds; symmetric to swapping labels; unaffected by class imbalance directly.</li>
+        <li><strong>PR-AUC</strong> plots precision vs recall; extremely sensitive to the positive-class prevalence.</li>
+        <li>When the positive class is rare (fraud, rare disease, click-through), a high ROC-AUC can hide the fact that precision is terrible &mdash; ROC's FPR denominator is huge, so absolute false-positive counts don't hurt the score much.</li>
+        <li>Rule: if the cost of a false positive matters (and negatives dominate), report PR-AUC. If both classes are balanced and you want a symmetric ranking metric, ROC-AUC is fine.</li>
+      </ul>`,
+    src: "Saito & Rehmsmeier — The Precision-Recall Plot Is More Informative than the ROC Plot",
+    url: "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0118432"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Compare regression metrics: RMSE, MAE, MAPE, R&sup2;.",
+    body: `
+      <ul class="points">
+        <li><strong>RMSE</strong> &mdash; &#x221A;mean squared error. Same units as y. Penalizes large errors quadratically &mdash; sensitive to outliers.</li>
+        <li><strong>MAE</strong> &mdash; mean absolute error. Robust to outliers; equal weight to all errors. Not differentiable at 0, so less common as a training loss.</li>
+        <li><strong>MAPE</strong> &mdash; mean absolute percentage error. Scale-invariant, good for comparing across series of different magnitude. Blows up when y is near 0.</li>
+        <li><strong>R&sup2;</strong> &mdash; fraction of variance explained; unitless, easy to communicate. Negative if the model is worse than predicting the mean.</li>
+      </ul>
+      <p class="answer">Pick RMSE/MAE for training loss; report R&sup2; for stakeholder communication; use MAPE when errors should scale with the target.</p>`,
+    src: "Hyndman & Athanasopoulos — Forecasting: Principles and Practice",
+    url: "https://otexts.com/fpp3/accuracy.html"
+  },
+  {
+    cat: "ML Foundations",
+    q: "How does cross-validation change for time-series data?",
+    body: `
+      <ul class="points">
+        <li>Regular k-fold leaks the future into the past &mdash; a training fold may sit chronologically <em>after</em> its validation fold. That inflates estimated performance.</li>
+        <li><strong>Forward-chaining (walk-forward) CV</strong>: always train on data up to time t, evaluate on t+1 to t+h, then slide. Growing or rolling window.</li>
+        <li>Also consider a <strong>gap</strong> (embargo) between train and validation to avoid label leakage through short-term autocorrelation.</li>
+        <li>Never shuffle time-series data.</li>
+      </ul>`,
+    src: "scikit-learn — TimeSeriesSplit",
+    url: "https://scikit-learn.org/stable/modules/cross_validation.html#time-series-split"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Grid search vs random search vs Bayesian optimization for hyperparameter tuning.",
+    body: `
+      <ul class="points">
+        <li><strong>Grid search</strong> &mdash; exhaustive over a discrete grid. Simple; wastes budget on unimportant dimensions.</li>
+        <li><strong>Random search</strong> &mdash; sample uniformly from ranges. Bergstra & Bengio showed random beats grid because only a few hyperparameters actually matter, and random covers those dimensions densely by luck.</li>
+        <li><strong>Bayesian optimization</strong> (Hyperopt, Optuna, GP-BO) &mdash; fit a surrogate model over the search space, use an acquisition function (EI, UCB) to pick the next trial. Best for expensive-to-evaluate models with &lt; 30 hyperparameters.</li>
+        <li><strong>Hyperband / ASHA</strong> &mdash; early-stop bad configs to reallocate budget. Standard for deep learning at scale.</li>
+      </ul>`,
+    src: "Bergstra & Bengio — Random Search for Hyper-Parameter Optimization",
+    url: "https://jmlr.org/papers/v13/bergstra12a.html"
+  },
+  {
+    cat: "ML Foundations",
+    q: "How do you read a learning curve to distinguish bias from variance?",
+    body: `
+      <p class="answer">Plot training error and validation error against training-set size.</p>
+      <ul class="points">
+        <li><strong>Both high, small gap</strong> &rarr; <em>high bias</em> (underfit). Adding data won't help. Increase capacity, add features, train longer.</li>
+        <li><strong>Train low, val high, large gap that narrows as data grows</strong> &rarr; <em>high variance</em> (overfit). More data helps; so does regularization.</li>
+        <li><strong>Train and val plateau together at low error</strong> &rarr; well-fit; you may be near the irreducible-noise floor.</li>
+      </ul>
+      <p class="answer">Also plot against training <em>epochs</em>: rising val error while train keeps dropping is the classic overfitting signal.</p>`,
+    src: "Ng — Machine Learning Yearning (Ch. 27–29)",
+    url: "https://www.deeplearning.ai/machine-learning-yearning/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What does the No Free Lunch theorem actually say, and what should you take from it?",
+    body: `
+      <p class="answer">Averaged over the space of <em>all possible</em> problems (all target functions with equal prior probability), every learning algorithm has the same expected performance. No algorithm is universally best.</p>
+      <ul class="points">
+        <li>In practice, we don't face all possible problems &mdash; we face real-world problems that share strong structure (smoothness, hierarchy, sparsity).</li>
+        <li>Algorithm choice is really <strong>inductive-bias choice</strong>: which structural assumption is most likely to match your data (locality for CNNs, sequential dependence for Transformers, monotone splits for GBDTs).</li>
+        <li>Doesn't mean "try everything randomly" &mdash; it means think about your data's structure and match the model to it.</li>
+      </ul>`,
+    src: "Wolpert — The Lack of A Priori Distinctions between Learning Algorithms",
+    url: "https://www.mitpressjournals.org/doi/abs/10.1162/neco.1996.8.7.1341"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What is VC dimension, and what does it tell you about generalization?",
+    body: `
+      <p class="answer">The <strong>VC dimension</strong> of a hypothesis class H is the largest number of points that H can shatter &mdash; label with every possible +/&minus; assignment.</p>
+      <ul class="points">
+        <li>Higher VC dim &rarr; more flexible model &rarr; risk of overfitting.</li>
+        <li>PAC bound: with n examples, generalization error is bounded by training error + O(&#x221A;(VC-dim / n)) (up to log factors).</li>
+        <li>Linear classifiers in d dimensions have VC dim d + 1. Decision trees have unbounded VC dim.</li>
+        <li>Deep networks have huge VC dimension yet generalize &mdash; VC theory alone can't explain modern deep learning. Newer tools (Rademacher complexity, PAC-Bayes, implicit regularization) do better.</li>
+      </ul>`,
+    src: "Vapnik — The Nature of Statistical Learning Theory",
+    url: "https://link.springer.com/book/10.1007/978-1-4757-3264-1"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Bagging vs boosting vs stacking — how do the three ensembling ideas differ?",
+    body: `
+      <ul class="points">
+        <li><strong>Bagging</strong> &mdash; train independently on bootstrap resamples, average predictions. Reduces variance. High-variance base learners (deep trees) benefit most. Random Forest is the archetype.</li>
+        <li><strong>Boosting</strong> &mdash; train sequentially, each learner focuses on the residual errors of the previous ones. Reduces bias. Weak learners (shallow trees) work best. AdaBoost, GBM, XGBoost.</li>
+        <li><strong>Stacking</strong> &mdash; train diverse base learners, then a meta-model that learns to combine their predictions on held-out folds. Reduces both bias and variance if the base learners make different mistakes.</li>
+      </ul>
+      <p class="answer">In production, one well-tuned GBDT usually beats a stacking ensemble; stacking wins in competitions where fractions of a percent matter.</p>`,
+    src: "Hastie et al. — Elements of Statistical Learning (Ch. 10, 15, 16)",
+    url: "https://hastie.su.domains/ElemStatLearn/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "How do you detect anomalies in unlabeled data?",
+    body: `
+      <ul class="points">
+        <li><strong>Density-based</strong> &mdash; kernel density estimation, GMMs, KDE. Score anomalies by low likelihood. Struggles in high dimensions.</li>
+        <li><strong>Isolation Forest</strong> &mdash; anomalies are easy to isolate with random splits, so they get short path lengths in random trees. Scales well, few hyperparameters.</li>
+        <li><strong>One-class SVM</strong> &mdash; fit a boundary around the "normal" region.</li>
+        <li><strong>Reconstruction-based</strong> &mdash; train an autoencoder on normal data; anomalies reconstruct poorly.</li>
+        <li>Evaluation is hard: anomalies are rare and typically not labeled. Rely on domain review, injected synthetic anomalies, and precision@k.</li>
+      </ul>`,
+    src: "Liu et al. — Isolation Forest",
+    url: "https://ieeexplore.ieee.org/document/4781136"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What are the standard strategies for handling missing data?",
+    body: `
+      <ul class="points">
+        <li><strong>Drop rows</strong> &mdash; fine only when missingness is minor and MCAR (missing completely at random). Rare in practice.</li>
+        <li><strong>Simple imputation</strong> &mdash; mean/median for numeric, mode for categorical. Fast; adds bias.</li>
+        <li><strong>Model-based imputation</strong> &mdash; k-NN, iterative imputation (MICE), or an autoencoder. Better but slower.</li>
+        <li><strong>Missing-indicator column</strong> &mdash; add a boolean "was missing" feature so the model can learn that missingness itself is predictive (medical data often is).</li>
+        <li><strong>Native handling</strong> &mdash; XGBoost/LightGBM learn a default direction for missing values at each split. Often the simplest correct answer for tabular ML.</li>
+      </ul>
+      <p class="answer">First understand the mechanism: MCAR, MAR (missing at random given observed features), or MNAR (missing not at random). Only MNAR is fundamentally hard and requires domain modeling.</p>`,
+    src: "van Buuren — Flexible Imputation of Missing Data",
+    url: "https://stefvanbuuren.name/fimd/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What is multicollinearity, and why does it matter for linear models but not for trees?",
+    body: `
+      <ul class="points">
+        <li>Two features are collinear if one is (nearly) a linear combination of others. Extreme case: two identical features.</li>
+        <li>Linear regression: the coefficient matrix becomes ill-conditioned. Coefficients become unstable, huge and opposite-signed, though predictions can still be OK. Individual coefficient interpretation breaks down.</li>
+        <li>Detect via <strong>Variance Inflation Factor (VIF)</strong> &mdash; VIF &gt; 10 flags a problem &mdash; or by looking at pairwise correlations and condition number.</li>
+        <li>Fix: drop redundant features, use L2/ridge (stabilizes coefficients), or use PCA before regression.</li>
+        <li>Tree ensembles are insensitive &mdash; they just pick one of the correlated features per split. Predictions unaffected; feature importance can be split arbitrarily between the correlated features.</li>
+      </ul>`,
+    src: "Hastie et al. — ESL (§3.3)",
+    url: "https://hastie.su.domains/ElemStatLearn/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What is data leakage? Give three ways it sneaks in.",
+    body: `
+      <p class="answer">Data leakage: information about the target that wouldn't be available at prediction time leaks into training. Causes wildly optimistic validation scores and silent failure in production.</p>
+      <ul class="points">
+        <li><strong>Preprocessing on the full dataset</strong> &mdash; fitting a scaler, imputer, or PCA on train+val together lets test statistics leak.</li>
+        <li><strong>Target-derived features</strong> &mdash; using the outcome (or something computed from it, like a running average) as input.</li>
+        <li><strong>Temporal leakage</strong> &mdash; training on data timestamped after the prediction target. Very common in time-series and clinical ML.</li>
+        <li><strong>Group leakage</strong> &mdash; the same user, patient, or session appears in both train and test splits.</li>
+      </ul>
+      <p class="answer">The tell: validation is suspiciously perfect, or production performance is much worse than validation. Trust nothing that looks too good.</p>`,
+    src: "Kaufman, Rosset & Perlich — Leakage in Data Mining",
+    url: "https://www.cs.umb.edu/~ding/history/470_670_fall_2011/papers/cs670_Tran_PreferredPaper_LeakingInDataMining.pdf"
+  },
+  {
+    cat: "ML Foundations",
+    q: "How do you encode cyclical features like hour-of-day or day-of-week?",
+    body: `
+      <p class="answer">Raw integer encoding (0 = Sunday, 6 = Saturday) tells the model Saturday and Sunday are far apart when they're actually adjacent.</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>hour</mtext><mo>&#x2192;</mo>
+          <mo>(</mo>
+          <mi>sin</mi><mo>(</mo><mn>2</mn><mi>&#x03C0;</mi><mo>&#x22C5;</mo><mtext>hour</mtext><mo>/</mo><mn>24</mn><mo>)</mo>
+          <mo>,</mo>
+          <mi>cos</mi><mo>(</mo><mn>2</mn><mi>&#x03C0;</mi><mo>&#x22C5;</mo><mtext>hour</mtext><mo>/</mo><mn>24</mn><mo>)</mo>
+          <mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Encoding as (sin, cos) of the fractional angle preserves cyclical distance &mdash; hour 23 and hour 0 are now neighbors.</li>
+        <li>Applies to day-of-week, day-of-year, wind direction, calendar month, etc.</li>
+        <li>For trees, one-hot works fine because splits can handle the wrap-around; the trick is essential for linear and neural models.</li>
+      </ul>`,
+    src: "Kaggle — Feature Engineering guide",
+    url: "https://www.kaggle.com/learn/feature-engineering"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Batch prediction vs online (streaming) inference — when do you pick each?",
+    body: `
+      <ul class="points">
+        <li><strong>Batch</strong> &mdash; run predictions for many entities on a schedule (nightly, hourly). Serve from a pre-computed table. Cheap, simple, fine when freshness &gt; ~15 min is acceptable.</li>
+        <li><strong>Online</strong> &mdash; predict on request. Necessary for real-time features, high-cardinality entities, or when the input can't be enumerated in advance (arbitrary user queries).</li>
+        <li>Online adds infrastructure: low-latency feature store, model server, monitoring, autoscaling.</li>
+        <li>Hybrid: pre-compute expensive features in batch, do the model forward pass online. Very common.</li>
+      </ul>`,
+    src: "Chip Huyen — Designing Machine Learning Systems (Ch. 7)",
+    url: "https://huyenchip.com/ml-systems-book/"
+  },
+  {
+    cat: "ML Foundations",
+    q: "What is concept drift, and how do you monitor for it in production?",
+    body: `
+      <ul class="points">
+        <li><strong>Data drift</strong> &mdash; the distribution of inputs P(X) shifts. Detect by comparing feature distributions to a reference (KS test, PSI, KL divergence).</li>
+        <li><strong>Label drift</strong> &mdash; the marginal P(Y) shifts. E.g., fraud rate spikes.</li>
+        <li><strong>Concept drift</strong> &mdash; P(Y | X) changes: the same inputs now imply different outputs. This is the deadly one; only detectable when you have labels.</li>
+        <li>Mitigations: rolling retrain schedule, drift-triggered retraining, shadow deployment, alerting on downstream business metrics.</li>
+      </ul>
+      <p class="answer">Retraining fixes drift but not <strong>bias drift</strong>: if the label distribution has changed for reasons your features can't capture, retraining on new data just chases the shift.</p>`,
+    src: "Gama et al. — A Survey on Concept Drift Adaptation",
+    url: "https://dl.acm.org/doi/10.1145/2523813"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Compare feature-importance methods: gain, permutation, SHAP.",
+    body: `
+      <ul class="points">
+        <li><strong>Gain / split importance</strong> (tree-based) &mdash; sum of loss reduction across all splits that used a feature. Fast, but biased toward high-cardinality and correlated features.</li>
+        <li><strong>Permutation importance</strong> &mdash; shuffle a feature on the validation set and measure the drop in score. Model-agnostic; correct on paper; suffers when features are correlated (shuffling one doesn't remove the info because it's still in the correlated partner).</li>
+        <li><strong>SHAP</strong> &mdash; Shapley-value decomposition of individual predictions. Locally correct (per-example), globally aggregable, handles correlation through conditional expectations. More expensive but the modern gold standard.</li>
+      </ul>
+      <p class="answer">Different methods can rank features differently. Trust patterns that survive at least two of them.</p>`,
+    src: "Lundberg & Lee — A Unified Approach to Interpreting Model Predictions (SHAP)",
+    url: "https://arxiv.org/abs/1705.07874"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Compare Platt scaling and isotonic regression for calibrating a classifier's probabilities.",
+    body: `
+      <ul class="points">
+        <li><strong>Platt scaling</strong> &mdash; fit a sigmoid f(z) = 1 / (1 + exp(&minus;Az + B)) that maps model scores to probabilities. Two parameters &mdash; needs little data. Works when the miscalibration is sigmoidal in shape (typical for SVM outputs).</li>
+        <li><strong>Isotonic regression</strong> &mdash; fit a non-parametric monotone step function. Handles arbitrary monotone calibration shapes but needs more data (~1k+ examples) to be reliable.</li>
+        <li><strong>Temperature scaling</strong> is Platt-like for softmax neural nets: a single scalar T. Preserves the argmax (predictions unchanged) but softens confidence. Standard for deep nets.</li>
+        <li>Always fit the calibrator on a held-out set that was not used to train the classifier.</li>
+      </ul>`,
+    src: "Niculescu-Mizil & Caruana — Predicting Good Probabilities With Supervised Learning",
+    url: "https://www.cs.cornell.edu/~alexn/papers/calibration.icml05.crc.rev3.pdf"
+  },
+  {
+    cat: "ML Foundations",
+    q: "You have severe class imbalance and can't collect more minority-class data. What do you do?",
+    body: `
+      <ul class="points">
+        <li><strong>Change the metric first</strong> &mdash; accuracy is useless. Use precision/recall, F1, AUPRC, and pick the operating point on validation.</li>
+        <li><strong>Resample</strong> &mdash; oversample minority (with replacement or SMOTE) or undersample majority. Cheap and effective, but risk overfitting duplicated minority examples.</li>
+        <li><strong>Cost-sensitive loss</strong> &mdash; weight minority-class errors more heavily (class weights, or focal loss for extreme imbalance).</li>
+        <li><strong>Threshold tuning</strong> &mdash; train on natural distribution but move the decision threshold to hit your target precision/recall.</li>
+        <li><strong>Two-stage training</strong> &mdash; pretrain on natural distribution, fine-tune the classifier head with balanced sampling. Better calibrated than end-to-end resampled training.</li>
+      </ul>`,
+    src: "Chawla et al. — SMOTE; Cui et al. — Class-Balanced Loss",
+    url: "https://arxiv.org/abs/1901.05555"
+  },
+  {
+    cat: "ML Foundations",
+    q: "Compare filter, wrapper, and embedded feature selection methods.",
+    body: `
+      <ul class="points">
+        <li><strong>Filter</strong> methods rank features by a statistic (correlation with target, mutual information, chi-squared, ANOVA F) independently of any model. Fast, model-agnostic; blind to feature interactions.</li>
+        <li><strong>Wrapper</strong> methods (forward/backward selection, recursive feature elimination) train the actual model repeatedly to score feature subsets. Interaction-aware; expensive.</li>
+        <li><strong>Embedded</strong> methods do selection during training: L1/Lasso zeros out coefficients, GBDT importance ranks features, elastic net trades off L1/L2.</li>
+      </ul>
+      <p class="answer">Modern workflow: use tree ensembles as an embedded selector + SHAP for validation of the ranking, and reach for wrappers only when the model is small and the feature budget is tight.</p>`,
+    src: "Guyon & Elisseeff — An Introduction to Variable and Feature Selection",
+    url: "https://jmlr.org/papers/v3/guyon03a.html"
+  },
 
   /* ===================== PROBABILITY & STATS ===================== */
   {
@@ -510,6 +1099,696 @@ const CARDS = [
       </ul>`,
     src: "Ng & Jordan — On Discriminative vs Generative Classifiers (NeurIPS 2001)",
     url: "https://ai.stanford.edu/~ang/papers/nips01-discriminativegenerative.pdf"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "Bernoulli, Binomial, Multinomial — when to use each?",
+    body: `
+      <ul class="points">
+        <li><strong>Bernoulli(p)</strong> &mdash; one coin flip, outcome 0 or 1. Mean p, variance p(1&minus;p).</li>
+        <li><strong>Binomial(n, p)</strong> &mdash; sum of n iid Bernoullis. Number of successes in n trials.</li>
+        <li><strong>Multinomial(n, p<sub>1</sub>, &#x2026;, p<sub>K</sub>)</strong> &mdash; generalization to K outcomes; the class distribution behind softmax classification.</li>
+        <li>Common gotcha: "logistic regression" outputs a Bernoulli likelihood per example, not a Binomial.</li>
+      </ul>`,
+    src: "Bishop — PRML (§2.1–2.2)",
+    url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "When is the Poisson distribution the right model?",
+    body: `
+      <p class="answer">Poisson(&#x03BB;) counts the number of independent events occurring in a fixed interval when the rate is constant.</p>
+      <div class="eq">
+        <math display="block">
+          <mi>P</mi><mo>(</mo><mi>X</mi><mo>=</mo><mi>k</mi><mo>)</mo>
+          <mo>=</mo>
+          <mfrac><mrow><msup><mi>&#x03BB;</mi><mi>k</mi></msup><msup><mi>e</mi><mrow><mo>&#x2212;</mo><mi>&#x03BB;</mi></mrow></msup></mrow><mrow><mi>k</mi><mo>!</mo></mrow></mfrac>
+          <mo>,</mo>
+          <mspace width="1em"/>
+          <mtext>Mean</mtext><mo>=</mo><mtext>Var</mtext><mo>=</mo><mi>&#x03BB;</mi>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Emerges as the limit of Binomial(n, &#x03BB;/n) as n &rarr; &#x221E;.</li>
+        <li>Uses: server requests per minute, defects per unit, click counts.</li>
+        <li>Requires <strong>Var &#x2248; Mean</strong>. Real count data is often <em>overdispersed</em>; use Negative Binomial when Var &gt; Mean.</li>
+      </ul>`,
+    src: "Wasserman — All of Statistics (§2.4)",
+    url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "Why is the Gaussian so central to statistics?",
+    body: `
+      <ul class="points">
+        <li><strong>Central Limit Theorem</strong> &mdash; sums of many small independent perturbations converge to Gaussian.</li>
+        <li><strong>Maximum entropy</strong> distribution given a fixed mean and variance. Least assumption you can make.</li>
+        <li><strong>Analytical convenience</strong> &mdash; closed-form MLE, closed-form posteriors under conjugate priors, closed-form marginals and conditionals for the multivariate case.</li>
+        <li><strong>Closed under linear operations</strong> &mdash; sum, difference, and linear transform of Gaussians are Gaussian.</li>
+      </ul>
+      <p class="answer">Trap: real-world data has heavy tails (finance returns, latencies) that Gaussians badly underweight. Student's t or empirical CDFs are safer for outlier-heavy data.</p>`,
+    src: "Bishop — PRML (Ch. 2)",
+    url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is the memoryless property, and which distributions have it?",
+    body: `
+      <p class="answer">A distribution is <strong>memoryless</strong> if P(X &gt; s+t | X &gt; s) = P(X &gt; t) &mdash; the future is independent of how long you've already waited.</p>
+      <ul class="points">
+        <li>Only two distributions have this: <strong>Exponential</strong> (continuous) and <strong>Geometric</strong> (discrete).</li>
+        <li>Consequence: the exponential is the unique inter-event time for a Poisson process &mdash; no matter how long since the last event, the distribution of time to the next one is unchanged.</li>
+        <li>Sanity check: memorylessness rules out human lifetimes, machine failures, and most real durations. When the hazard rate is constant, exponential fits; when it rises or falls with age, use Weibull or Gamma.</li>
+      </ul>`,
+    src: "Ross — Introduction to Probability Models",
+    url: "https://www.elsevier.com/books/introduction-to-probability-models/ross/978-0-12-407948-9"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "Why is the Beta distribution the conjugate prior for Bernoulli/Binomial?",
+    body: `
+      <p class="answer">Beta(&#x03B1;, &#x03B2;) has density &prop; p<sup>&#x03B1;&minus;1</sup>(1&minus;p)<sup>&#x03B2;&minus;1</sup>. Multiplying by a Binomial likelihood p<sup>k</sup>(1&minus;p)<sup>n&minus;k</sup> gives Beta(&#x03B1;+k, &#x03B2;+n&minus;k) &mdash; the same functional form.</p>
+      <ul class="points">
+        <li>&#x03B1; and &#x03B2; act like <strong>pseudo-counts</strong> of prior successes and failures.</li>
+        <li>Posterior mean = (&#x03B1;+k)/(&#x03B1;+&#x03B2;+n) &mdash; a weighted average of prior mean and observed rate.</li>
+        <li>Beta(1, 1) is uniform &mdash; a common "uninformative" prior. Beta(0.5, 0.5) (Jeffreys) has stronger theoretical grounding.</li>
+        <li>Beta is fundamental in A/B testing, click-through modeling, and Bayesian bandits.</li>
+      </ul>`,
+    src: "Gelman et al. — Bayesian Data Analysis (§2.4)",
+    url: "http://www.stat.columbia.edu/~gelman/book/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is the Dirichlet distribution, and where does it show up in ML?",
+    body: `
+      <p class="answer">The Dirichlet is the multivariate generalization of Beta &mdash; a distribution over the K-simplex (probability vectors summing to 1).</p>
+      <div class="eq">
+        <math display="block">
+          <mtext>Dir</mtext><mo>(</mo><mi>&#x03B1;</mi><mo>)</mo>
+          <mo>&#x221D;</mo>
+          <munderover><mo>&#x220F;</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover>
+          <msup><msub><mi>p</mi><mi>k</mi></msub><mrow><msub><mi>&#x03B1;</mi><mi>k</mi></msub><mo>&#x2212;</mo><mn>1</mn></mrow></msup>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Conjugate prior for the Multinomial &mdash; conjugate updates just add observed counts to &#x03B1;.</li>
+        <li>Foundation of <strong>Latent Dirichlet Allocation (LDA)</strong>, mixed-membership models, and Bayesian topic modeling.</li>
+        <li>Parameter &#x03B1; controls concentration: &#x03B1;<sub>k</sub> &gt; 1 favors uniform p; &#x03B1;<sub>k</sub> &lt; 1 favors sparse p (mass on a few components).</li>
+      </ul>`,
+    src: "Blei, Ng & Jordan — Latent Dirichlet Allocation",
+    url: "https://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "When should you use Student's t instead of a Gaussian?",
+    body: `
+      <ul class="points">
+        <li>Student's t has <strong>heavier tails</strong> than the Gaussian, controlled by the degrees-of-freedom &#x03BD;. As &#x03BD; &rarr; &#x221E;, t &rarr; Gaussian; small &#x03BD; gives fat tails.</li>
+        <li>Use when your data has outliers or you're inferring the mean from a small sample with unknown variance &mdash; the t-distribution accounts for the extra uncertainty from estimating &sigma;.</li>
+        <li>t-tests use this: the test statistic is t-distributed, not normal, when &sigma; is estimated from data.</li>
+        <li>Bayesian robust regression uses Student's t as the noise model to reduce outlier influence without manual clipping.</li>
+      </ul>`,
+    src: "Wasserman — All of Statistics (§10.3)",
+    url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What makes the multivariate Gaussian so useful?",
+    body: `
+      <p class="answer">A d-dimensional Gaussian is fully specified by its mean vector &#x03BC; and covariance matrix &#x03A3;. Density is proportional to exp(&minus;&frac12;(x&minus;&#x03BC;)<sup>T</sup>&#x03A3;<sup>&minus;1</sup>(x&minus;&#x03BC;)).</p>
+      <ul class="points">
+        <li><strong>Any marginal</strong> is Gaussian; <strong>any conditional</strong> is Gaussian with a closed-form formula. Neither is generally true for non-Gaussian distributions.</li>
+        <li>Uncorrelated components of a multivariate Gaussian are <em>independent</em> &mdash; only true for Gaussians.</li>
+        <li>The Kalman filter, GPs, Gaussian mixtures, and the VAE all exploit these closed-form properties.</li>
+        <li>Curse: &#x03A3; has O(d&sup2;) parameters. In high-D you have to constrain it (diagonal, low-rank + diagonal) or you can't estimate it.</li>
+      </ul>`,
+    src: "Bishop — PRML (§2.3)",
+    url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "Give definitions and key properties of expected value and variance.",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mi>&#x1D53C;</mi><mo>[</mo><mi>X</mi><mo>]</mo>
+          <mo>=</mo>
+          <mo>&#x222B;</mo><mi>x</mi><mi>p</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>&#x2009;</mo><mi>d</mi><mi>x</mi>
+          <mspace width="2em"/>
+          <mtext>Var</mtext><mo>(</mo><mi>X</mi><mo>)</mo>
+          <mo>=</mo>
+          <mi>&#x1D53C;</mi><mo>[</mo><msup><mi>X</mi><mn>2</mn></msup><mo>]</mo><mo>&#x2212;</mo><msup><mrow><mi>&#x1D53C;</mi><mo>[</mo><mi>X</mi><mo>]</mo></mrow><mn>2</mn></msup>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>Linearity of expectation</strong>: E[aX + bY] = aE[X] + bE[Y] regardless of dependence.</li>
+        <li><strong>Variance</strong> is not linear: Var(X + Y) = Var(X) + Var(Y) + 2 Cov(X, Y). Only independent variables let you drop the covariance term.</li>
+        <li>Var(aX) = a&sup2; Var(X). Standard deviation scales like a.</li>
+      </ul>`,
+    src: "Wasserman — All of Statistics (Ch. 3)",
+    url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "State the Law of Large Numbers vs the Central Limit Theorem in one line each.",
+    body: `
+      <ul class="points">
+        <li><strong>LLN</strong> &mdash; the sample mean of iid observations converges (in probability) to the true mean as n &rarr; &#x221E;. Tells you <em>where</em> the mean estimate goes.</li>
+        <li><strong>CLT</strong> &mdash; the standardized sample mean converges in distribution to a standard normal, regardless of the underlying distribution (with finite variance). Tells you <em>how it fluctuates</em> around the true mean.</li>
+      </ul>
+      <p class="answer">LLN justifies Monte Carlo estimation; CLT justifies confidence intervals of the form &#x03BC; &#x00B1; z &sigma;/&#x221A;n. Both fail for heavy-tailed distributions without finite variance (Cauchy, some power laws).</p>`,
+    src: "Wasserman — All of Statistics (§5.3–5.5)",
+    url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "Define bias and variance of an estimator. What is MSE decomposition?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mtext>MSE</mtext>
+          <mo>=</mo>
+          <mi>&#x1D53C;</mi><mo>[</mo><msup><mrow><mo>(</mo><mover><mi>&#x03B8;</mi><mo>^</mo></mover><mo>&#x2212;</mo><mi>&#x03B8;</mi><mo>)</mo></mrow><mn>2</mn></msup><mo>]</mo>
+          <mo>=</mo>
+          <msup><mrow><mtext>Bias</mtext><mo>(</mo><mover><mi>&#x03B8;</mi><mo>^</mo></mover><mo>)</mo></mrow><mn>2</mn></msup>
+          <mo>+</mo>
+          <mtext>Var</mtext><mo>(</mo><mover><mi>&#x03B8;</mi><mo>^</mo></mover><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>Bias</strong> &mdash; E[&#x03B8;&#x0302;] &minus; &#x03B8;. Systematic error.</li>
+        <li><strong>Variance</strong> &mdash; spread of &#x03B8;&#x0302; around its own mean.</li>
+        <li>A biased estimator can beat an unbiased one on MSE if the bias is small compared to the variance reduction (ridge regression is the archetype).</li>
+      </ul>`,
+    src: "Casella & Berger — Statistical Inference (§7.3)",
+    url: "https://www.cengage.com/c/statistical-inference-2e-casella/9780534243128/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What does it mean for an estimator to be consistent and asymptotically normal?",
+    body: `
+      <ul class="points">
+        <li><strong>Consistent</strong> &mdash; &#x03B8;&#x0302;<sub>n</sub> converges in probability to the true &#x03B8; as n &rarr; &#x221E;. The estimator gets it right with unlimited data.</li>
+        <li><strong>Asymptotically normal</strong> &mdash; &#x221A;n(&#x03B8;&#x0302;<sub>n</sub> &minus; &#x03B8;) &rarr; N(0, V). We know how it fluctuates around the truth at large n.</li>
+        <li>MLE is (under regularity conditions) consistent, asymptotically normal, and <strong>asymptotically efficient</strong> &mdash; its variance achieves the Cram&eacute;r-Rao lower bound.</li>
+        <li>These are large-n guarantees. At small n an efficient estimator can still be miserable; use bootstrap CIs when in doubt.</li>
+      </ul>`,
+    src: "Casella & Berger — Statistical Inference (Ch. 10)",
+    url: "https://www.cengage.com/c/statistical-inference-2e-casella/9780534243128/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "Covariance vs correlation — same thing?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mi>Corr</mi><mo>(</mo><mi>X</mi><mo>,</mo><mi>Y</mi><mo>)</mo>
+          <mo>=</mo>
+          <mfrac><mrow><mi>Cov</mi><mo>(</mo><mi>X</mi><mo>,</mo><mi>Y</mi><mo>)</mo></mrow><mrow><msub><mi>&#x03C3;</mi><mi>X</mi></msub><msub><mi>&#x03C3;</mi><mi>Y</mi></msub></mrow></mfrac>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Covariance has units (of X &times; Y); correlation is unitless and in [&minus;1, 1].</li>
+        <li>Correlation is a normalized covariance &mdash; use it to compare relationships across variable scales.</li>
+        <li>Both measure <strong>only linear</strong> dependence. Two variables can have zero correlation and be perfectly related (Y = X&sup2; on symmetric X).</li>
+        <li>Zero correlation implies independence only for jointly Gaussian variables. Otherwise it does not.</li>
+      </ul>`,
+    src: "Wasserman — All of Statistics (§3.4)",
+    url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is conditional independence, and why does it matter?",
+    body: `
+      <p class="answer">X and Y are conditionally independent given Z if P(X, Y | Z) = P(X | Z) P(Y | Z). Written X &#x22A5; Y | Z.</p>
+      <ul class="points">
+        <li>Two variables can be dependent unconditionally and independent given a third (Simpson's paradox is one way this bites you).</li>
+        <li>Foundation of graphical models: a Bayesian network's structure encodes a set of conditional independences among its variables.</li>
+        <li>Naive Bayes assumes features are all conditionally independent given the class label &mdash; almost never true, but produces strong classifiers anyway.</li>
+        <li>d-separation reads independences off a DAG structure; used everywhere in causal inference.</li>
+      </ul>`,
+    src: "Koller & Friedman — Probabilistic Graphical Models",
+    url: "https://mitpress.mit.edu/9780262013192/probabilistic-graphical-models/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "State Jensen's inequality. Where does it appear in ML?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mtext>For convex&nbsp;</mtext><mi>&#x03D5;</mi><mtext>,&nbsp;</mtext>
+          <mi>&#x03D5;</mi><mo>(</mo><mi>&#x1D53C;</mi><mo>[</mo><mi>X</mi><mo>]</mo><mo>)</mo>
+          <mo>&#x2264;</mo>
+          <mi>&#x1D53C;</mi><mo>[</mo><mi>&#x03D5;</mi><mo>(</mo><mi>X</mi><mo>)</mo><mo>]</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>For concave functions the inequality flips.</li>
+        <li><strong>ELBO derivation</strong> in variational inference &mdash; Jensen on the log likelihood gives the standard lower bound.</li>
+        <li><strong>KL divergence &ge; 0</strong> follows from Jensen applied to &minus;log.</li>
+        <li><strong>Gibbs' inequality</strong>, log-sum inequality, EM's monotonic improvement &mdash; all built on Jensen.</li>
+      </ul>`,
+    src: "Cover & Thomas — Elements of Information Theory (§2.6)",
+    url: "https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What are conjugate priors, and why are they useful?",
+    body: `
+      <p class="answer">A prior is <strong>conjugate</strong> to a likelihood if the posterior belongs to the same family as the prior. The posterior is then available in closed form.</p>
+      <ul class="points">
+        <li>Bernoulli / Binomial &harr; Beta</li>
+        <li>Multinomial &harr; Dirichlet</li>
+        <li>Poisson &harr; Gamma</li>
+        <li>Gaussian (known &#x03C3;) &harr; Gaussian on the mean</li>
+        <li>Gaussian (unknown &#x03BC;, &#x03C3;) &harr; Normal-Inverse-Gamma</li>
+      </ul>
+      <p class="answer">Conjugacy avoids MCMC and gives interpretable pseudo-count semantics. Its price is inflexibility &mdash; you're stuck with the shape of that prior family. With modern MCMC and VI, conjugacy is a convenience, not a requirement.</p>`,
+    src: "Gelman et al. — Bayesian Data Analysis (§2.4–2.6)",
+    url: "http://www.stat.columbia.edu/~gelman/book/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is the posterior predictive distribution, and why is it what you actually want?",
+    body: `
+      <p class="answer">The posterior predictive gives the probability of a new observation given the training data, marginalizing over parameter uncertainty:</p>
+      <div class="eq">
+        <math display="block">
+          <mi>p</mi><mo>(</mo><msub><mi>x</mi><mtext>new</mtext></msub><mo>|</mo><mi>D</mi><mo>)</mo>
+          <mo>=</mo>
+          <mo>&#x222B;</mo>
+          <mi>p</mi><mo>(</mo><msub><mi>x</mi><mtext>new</mtext></msub><mo>|</mo><mi>&#x03B8;</mi><mo>)</mo>
+          <mi>p</mi><mo>(</mo><mi>&#x03B8;</mi><mo>|</mo><mi>D</mi><mo>)</mo>
+          <mo>&#x2009;</mo><mi>d</mi><mi>&#x03B8;</mi>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Averages predictions over all &#x03B8; consistent with the data, weighted by posterior probability &mdash; captures parameter uncertainty.</li>
+        <li>Predictions from MAP/MLE plug in a single point estimate. Posterior predictive is wider and better calibrated, especially with small n.</li>
+        <li>In practice approximated by Monte Carlo: sample &#x03B8;<sub>i</sub> ~ p(&#x03B8;|D), average p(x<sub>new</sub>|&#x03B8;<sub>i</sub>).</li>
+      </ul>`,
+    src: "Gelman et al. — Bayesian Data Analysis (§2.9)",
+    url: "http://www.stat.columbia.edu/~gelman/book/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "How does Metropolis-Hastings work in one paragraph?",
+    body: `
+      <p class="answer">Simulate a Markov chain whose stationary distribution is the target &pi;(x). At each step: propose x' from a proposal q(x'|x); accept with probability</p>
+      <div class="eq">
+        <math display="block">
+          <mi>&#x03B1;</mi>
+          <mo>=</mo>
+          <mi>min</mi>
+          <mfenced><mrow><mn>1</mn><mo>,</mo>
+            <mfrac>
+              <mrow><mi>&#x03C0;</mi><mo>(</mo><msup><mi>x</mi><mo>&#x2032;</mo></msup><mo>)</mo><mi>q</mi><mo>(</mo><mi>x</mi><mo>|</mo><msup><mi>x</mi><mo>&#x2032;</mo></msup><mo>)</mo></mrow>
+              <mrow><mi>&#x03C0;</mi><mo>(</mo><mi>x</mi><mo>)</mo><mi>q</mi><mo>(</mo><msup><mi>x</mi><mo>&#x2032;</mo></msup><mo>|</mo><mi>x</mi><mo>)</mo></mrow>
+            </mfrac>
+          </mrow></mfenced>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Only needs &pi; up to a normalizing constant &mdash; the intractable denominator cancels in the ratio.</li>
+        <li>Detailed balance ensures &pi; is the stationary distribution.</li>
+        <li>Proposal tuning is everything: too small &rarr; slow mixing; too large &rarr; rejections dominate. Target ~23% acceptance in high dimensions.</li>
+        <li>Successors: Hamiltonian Monte Carlo (HMC), NUTS, Langevin dynamics &mdash; use gradient information for far better mixing.</li>
+      </ul>`,
+    src: "Robert & Casella — Monte Carlo Statistical Methods",
+    url: "https://link.springer.com/book/10.1007/978-1-4757-4145-2"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is Gibbs sampling, and when is it a good choice?",
+    body: `
+      <p class="answer">A Metropolis-Hastings special case: at each step, sample one variable at a time from its full conditional distribution p(x<sub>i</sub> | x<sub>&minus;i</sub>). Acceptance is always 1.</p>
+      <ul class="points">
+        <li>Works well when full conditionals have closed form &mdash; Gaussian graphical models, hierarchical conjugate models, LDA topic modeling.</li>
+        <li>Mixes badly when variables are highly correlated &mdash; the sampler crawls along the ridge one coordinate at a time.</li>
+        <li>Fix: <strong>block Gibbs</strong> (sample groups jointly), or switch to HMC.</li>
+      </ul>`,
+    src: "Geman & Geman — Stochastic Relaxation, Gibbs Distributions, and the Bayesian Restoration of Images",
+    url: "https://ieeexplore.ieee.org/document/4767596"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What does variational inference do, and how does it trade off vs MCMC?",
+    body: `
+      <p class="answer">VI approximates an intractable posterior p(z|x) with a tractable family q<sub>&#x03D5;</sub>(z), and minimizes KL(q &Vert; p) &mdash; equivalently, maximizes the ELBO.</p>
+      <ul class="points">
+        <li>Turns Bayesian inference into an optimization problem &mdash; much faster and easier to scale than MCMC.</li>
+        <li>Trade-off: MCMC gives asymptotically exact samples; VI is <em>biased</em> because the true posterior is generally outside the chosen family q.</li>
+        <li>Mean-field VI assumes q factorizes across latent variables &mdash; simple but underestimates posterior variance.</li>
+        <li>Modern VI: normalizing flows for q; amortized inference (VAEs). The two families are converging.</li>
+      </ul>`,
+    src: "Blei, Kucukelbir & McAuliffe — Variational Inference: A Review for Statisticians",
+    url: "https://arxiv.org/abs/1601.00670"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What does a p-value actually mean, and what does it NOT mean?",
+    body: `
+      <p class="answer">Under the null hypothesis, a p-value is the probability of observing data at least as extreme as the actual data.</p>
+      <ul class="points">
+        <li>It is <strong>NOT</strong> the probability that the null is true.</li>
+        <li>It is <strong>NOT</strong> 1 minus the probability the alternative is true.</li>
+        <li>It is <strong>NOT</strong> the probability the observed effect will replicate.</li>
+        <li>p &lt; 0.05 doesn't mean "the effect is real". It means "if there were no effect, we'd rarely see data this extreme".</li>
+        <li>p-values interact badly with peeking, multiple comparisons, and underpowered studies &mdash; the reproducibility crisis is largely a p-value crisis.</li>
+      </ul>`,
+    src: "Wasserstein & Lazar — ASA Statement on p-Values",
+    url: "https://www.tandfonline.com/doi/full/10.1080/00031305.2016.1154108"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "Define Type I error, Type II error, and statistical power.",
+    body: `
+      <ul class="points">
+        <li><strong>Type I error</strong> (&#x03B1;) &mdash; rejecting a true null. False positive rate.</li>
+        <li><strong>Type II error</strong> (&#x03B2;) &mdash; failing to reject a false null. False negative rate.</li>
+        <li><strong>Power</strong> = 1 &minus; &#x03B2; &mdash; probability of correctly rejecting the null when the alternative is true.</li>
+      </ul>
+      <p class="answer">Power depends on effect size, sample size, &#x03B1;, and noise. Underpowered studies (typical target: 80% power) both miss real effects AND, paradoxically, when they do find effects those effects are inflated (winner's curse). Plan sample size before running the experiment.</p>`,
+    src: "Cohen — Statistical Power Analysis for the Behavioral Sciences",
+    url: "https://www.routledge.com/Statistical-Power-Analysis-for-the-Behavioral-Sciences/Cohen/p/book/9780805802832"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is the multiple testing problem? Bonferroni vs Benjamini-Hochberg.",
+    body: `
+      <p class="answer">Running many tests at &#x03B1; = 0.05 each inflates the family-wise false-positive rate. 20 independent tests &rarr; expected 1 false positive at &#x03B1; = 0.05.</p>
+      <ul class="points">
+        <li><strong>Bonferroni</strong> &mdash; use &#x03B1;/m per test. Controls family-wise error rate. Conservative; loses power fast with large m.</li>
+        <li><strong>Benjamini-Hochberg (BH)</strong> &mdash; sort p-values, find largest k with p<sub>(k)</sub> &le; (k/m)&#x03B1;, reject the smallest k. Controls <strong>false discovery rate</strong> &mdash; expected fraction of false positives among rejections. Much more powerful.</li>
+        <li>Modern default: FDR control with BH for exploratory analysis; family-wise control (Bonferroni or Holm) only when even one false positive is costly.</li>
+      </ul>`,
+    src: "Benjamini & Hochberg — Controlling the False Discovery Rate",
+    url: "https://www.jstor.org/stable/2346101"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What does a 95% confidence interval actually mean?",
+    body: `
+      <p class="answer">If you repeat the experiment many times and construct the CI each time, 95% of those intervals will contain the true parameter.</p>
+      <ul class="points">
+        <li>Any <em>particular</em> CI either contains &#x03B8; or doesn't &mdash; probability language applies to the procedure, not the interval you calculated.</li>
+        <li>NOT "95% probability that &#x03B8; is in this interval" (that's a <em>credible interval</em>, requiring a Bayesian prior).</li>
+        <li>Common mistake: computing a CI and then interpreting it Bayesianly. In many cases the numbers are close, but philosophically they're different objects.</li>
+        <li>Wider CI &rarr; less certain; narrower &rarr; more certain (or too optimistic if assumptions are wrong).</li>
+      </ul>`,
+    src: "Wasserman — All of Statistics (§6.3.2)",
+    url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "How do you design a basic A/B test, and what are the common ways it goes wrong?",
+    body: `
+      <ul class="points">
+        <li>Define the metric, effect size you care about, &#x03B1;, and desired power &mdash; then compute the required sample size before starting.</li>
+        <li>Randomize assignment; check for imbalance in covariates you'd expect to be balanced (SRM = Sample Ratio Mismatch is a red flag for bugs in the randomizer).</li>
+        <li>Common failures: <strong>peeking</strong> (deciding to stop when p-values dip), <strong>multiple metrics</strong> (measure many, celebrate the winner), <strong>network effects</strong> (users in the same social graph interfere), <strong>novelty effects</strong> (early behavior differs from steady state), <strong>selection bias</strong> in who reaches the experiment.</li>
+        <li>Report confidence intervals on the effect, not just p-values. Practical significance &ne; statistical significance.</li>
+      </ul>`,
+    src: "Kohavi, Tang & Xu — Trustworthy Online Controlled Experiments",
+    url: "https://experimentguide.com/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "Why is "peeking" at your A/B test dangerous, and how do you fix it?",
+    body: `
+      <p class="answer">Standard hypothesis tests assume you set the sample size in advance and look at the result once. If you check the p-value repeatedly and stop when it dips, your true Type I rate is much higher than &#x03B1;.</p>
+      <ul class="points">
+        <li>With unlimited peeking at 5% "significance", you'd eventually cross the threshold ~100% of the time even under the null.</li>
+        <li>Fixes: pre-register the sample size and don't stop early, or use methods designed for continuous monitoring &mdash; <strong>sequential probability ratio tests</strong>, <strong>alpha spending</strong>, or Bayesian methods with proper priors.</li>
+        <li>Modern tooling: mSPRT, always-valid confidence sequences (Howard et al.).</li>
+      </ul>`,
+    src: "Johari, Koomen, Pekelis & Walsh — Peeking at A/B Tests",
+    url: "https://arxiv.org/abs/1512.04922"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is entropy H(X), and what does it measure?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mi>H</mi><mo>(</mo><mi>X</mi><mo>)</mo>
+          <mo>=</mo>
+          <mo>&#x2212;</mo>
+          <munder><mo>&#x2211;</mo><mi>x</mi></munder>
+          <mi>p</mi><mo>(</mo><mi>x</mi><mo>)</mo><mi>log</mi><mi>p</mi><mo>(</mo><mi>x</mi><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Expected surprise, in nats (log e) or bits (log 2). Maximum for a uniform distribution over K outcomes: log K.</li>
+        <li>Shannon's source coding theorem: the minimum average number of bits to losslessly encode samples from p is H(X).</li>
+        <li>Zero for a deterministic variable; large for near-uniform ones.</li>
+        <li>Entropy of a Gaussian scales with log &sigma;<sup>2</sup> &mdash; spread, not location.</li>
+      </ul>`,
+    src: "Cover & Thomas — Elements of Information Theory (Ch. 2)",
+    url: "https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What does cross-entropy H(p, q) mean, and how does it relate to entropy and KL?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mi>H</mi><mo>(</mo><mi>p</mi><mo>,</mo><mi>q</mi><mo>)</mo>
+          <mo>=</mo>
+          <mo>&#x2212;</mo>
+          <munder><mo>&#x2211;</mo><mi>x</mi></munder>
+          <mi>p</mi><mo>(</mo><mi>x</mi><mo>)</mo><mi>log</mi><mi>q</mi><mo>(</mo><mi>x</mi><mo>)</mo>
+          <mo>=</mo>
+          <mi>H</mi><mo>(</mo><mi>p</mi><mo>)</mo><mo>+</mo><mtext>KL</mtext><mo>(</mo><mi>p</mi><mo>&#x2016;</mo><mi>q</mi><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Expected bits to encode samples from p using a code optimal for q &mdash; always &ge; H(p), with equality iff p = q.</li>
+        <li>Cross-entropy loss in classification: p is the one-hot true label distribution, q is the model output. Since H(p) = 0 for one-hot targets, minimizing cross-entropy = minimizing KL(p&Vert;q) = maximum likelihood.</li>
+      </ul>`,
+    src: "Cover & Thomas — Elements of Information Theory (§2.3)",
+    url: "https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "Define KL divergence. Why is it not a distance?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mtext>KL</mtext><mo>(</mo><mi>p</mi><mo>&#x2016;</mo><mi>q</mi><mo>)</mo>
+          <mo>=</mo>
+          <munder><mo>&#x2211;</mo><mi>x</mi></munder>
+          <mi>p</mi><mo>(</mo><mi>x</mi><mo>)</mo>
+          <mi>log</mi><mfrac><mrow><mi>p</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow><mrow><mi>q</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></mfrac>
+        </math>
+      </div>
+      <ul class="points">
+        <li>KL &ge; 0 always, with equality iff p = q (Gibbs' inequality).</li>
+        <li>NOT a metric: <strong>asymmetric</strong> (KL(p&Vert;q) &ne; KL(q&Vert;p)) and doesn't satisfy the triangle inequality.</li>
+        <li>Forward KL(p&Vert;q) is "mean-seeking" &mdash; q must have support wherever p does, so it spreads to cover p. Used in MLE.</li>
+        <li>Reverse KL(q&Vert;p) is "mode-seeking" &mdash; q concentrates on one high-p mode. Used in variational inference and RLHF.</li>
+      </ul>`,
+    src: "Cover & Thomas — Elements of Information Theory (§2.3)",
+    url: "https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is mutual information, and how does it relate to entropy?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mi>I</mi><mo>(</mo><mi>X</mi><mo>;</mo><mi>Y</mi><mo>)</mo>
+          <mo>=</mo>
+          <mi>H</mi><mo>(</mo><mi>X</mi><mo>)</mo><mo>&#x2212;</mo><mi>H</mi><mo>(</mo><mi>X</mi><mo>|</mo><mi>Y</mi><mo>)</mo>
+          <mo>=</mo>
+          <mtext>KL</mtext><mo>(</mo><mi>p</mi><mo>(</mo><mi>X</mi><mo>,</mo><mi>Y</mi><mo>)</mo>
+          <mo>&#x2016;</mo>
+          <mi>p</mi><mo>(</mo><mi>X</mi><mo>)</mo><mi>p</mi><mo>(</mo><mi>Y</mi><mo>)</mo><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Bits about X you gain by knowing Y (and vice versa &mdash; MI is symmetric).</li>
+        <li>Captures <strong>any</strong> statistical dependence, linear or not; correlation only captures linear.</li>
+        <li>I(X;Y) = 0 iff X and Y are independent.</li>
+        <li>InfoNCE and other contrastive losses are lower bounds on MI &mdash; foundational to modern representation learning.</li>
+      </ul>`,
+    src: "Cover & Thomas — Elements of Information Theory (§2.4)",
+    url: "https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "Jensen-Shannon divergence — how does it relate to KL, and where is it used?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mtext>JS</mtext><mo>(</mo><mi>p</mi><mo>&#x2016;</mo><mi>q</mi><mo>)</mo>
+          <mo>=</mo>
+          <mfrac><mn>1</mn><mn>2</mn></mfrac>
+          <mtext>KL</mtext><mo>(</mo><mi>p</mi><mo>&#x2016;</mo><mi>m</mi><mo>)</mo>
+          <mo>+</mo>
+          <mfrac><mn>1</mn><mn>2</mn></mfrac>
+          <mtext>KL</mtext><mo>(</mo><mi>q</mi><mo>&#x2016;</mo><mi>m</mi><mo>)</mo>
+          <mo>,</mo>
+          <mspace width="1em"/>
+          <mi>m</mi><mo>=</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mo>(</mo><mi>p</mi><mo>+</mo><mi>q</mi><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Symmetric, always finite, bounded (&le; log 2 with base-e).</li>
+        <li>Its square root is a true metric &mdash; unlike KL.</li>
+        <li>Used to compare distributions in NLP (topic models), in bioinformatics (sequence similarity), and it appears implicitly in the original GAN objective.</li>
+      </ul>`,
+    src: "Lin — Divergence Measures Based on the Shannon Entropy",
+    url: "https://ieeexplore.ieee.org/document/61115"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is the bootstrap, and when should you use it?",
+    body: `
+      <p class="answer">Given a sample of size n, draw B resamples of size n <em>with replacement</em>. Compute your statistic on each. The empirical distribution of those B values approximates the sampling distribution of the statistic.</p>
+      <ul class="points">
+        <li>Gets you a standard error and confidence interval for anything &mdash; even statistics with no closed-form variance (median, ratio, quantile).</li>
+        <li>Assumes the observed sample represents the population well &mdash; fails on very small or heavily skewed data.</li>
+        <li>Two flavors: <strong>percentile bootstrap</strong> (use empirical quantiles as CI endpoints) is simple; <strong>BCa</strong> (bias-corrected accelerated) is more accurate.</li>
+        <li>For time series, use block bootstrap &mdash; independent-resample destroys the autocorrelation structure.</li>
+      </ul>`,
+    src: "Efron & Tibshirani — An Introduction to the Bootstrap",
+    url: "https://www.crcpress.com/An-Introduction-to-the-Bootstrap/Efron-Tibshirani/p/book/9780412042317"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is reservoir sampling, and when do you reach for it?",
+    body: `
+      <p class="answer">Sample k items uniformly at random from a stream of unknown size in a single pass with O(k) memory.</p>
+      <ul class="points">
+        <li>Algorithm R: fill the reservoir with the first k items. For item i &gt; k, keep it with probability k/i (replacing a uniformly random reservoir slot).</li>
+        <li>Every stream position ends up in the reservoir with probability k/n, regardless of stream length or arrival order.</li>
+        <li>Uses: sampling logs, drawing training minibatches from a stream, reservoir-weighted sampling for random rows in a huge query.</li>
+      </ul>`,
+    src: "Vitter — Random Sampling with a Reservoir",
+    url: "https://dl.acm.org/doi/10.1145/3147.3165"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is the reparameterization trick, and why do we need it?",
+    body: `
+      <p class="answer">To compute &nabla;<sub>&#x03D5;</sub> E<sub>z ~ q<sub>&#x03D5;</sub></sub>[f(z)], you can't just push the gradient inside the expectation because the sampling depends on &#x03D5;.</p>
+      <ul class="points">
+        <li>Rewrite z as a deterministic transform of a fixed-distribution noise: for Gaussians, z = &#x03BC;<sub>&#x03D5;</sub> + &#x03C3;<sub>&#x03D5;</sub> &#x2299; &#x03B5;, &#x03B5; ~ N(0, I).</li>
+        <li>The randomness now lives outside the parameters, so gradients flow through &#x03BC; and &#x03C3;.</li>
+        <li>Foundation of VAEs, normalizing flows, and low-variance policy gradients.</li>
+        <li>For discrete z, the trick doesn't directly apply &mdash; use Gumbel-softmax (continuous relaxation) or score-function estimators (REINFORCE).</li>
+      </ul>`,
+    src: "Kingma & Welling — Auto-Encoding Variational Bayes",
+    url: "https://arxiv.org/abs/1312.6114"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "State Hoeffding's inequality. Why does it matter for ML?",
+    body: `
+      <p class="answer">For iid bounded random variables X<sub>i</sub> &#x2208; [a, b]:</p>
+      <div class="eq">
+        <math display="block">
+          <mi>P</mi><mo>(</mo>
+          <mo>|</mo>
+          <mover><mi>X</mi><mo>&#x00AF;</mo></mover>
+          <mo>&#x2212;</mo>
+          <mi>&#x03BC;</mi>
+          <mo>|</mo>
+          <mo>&#x2265;</mo><mi>t</mi>
+          <mo>)</mo>
+          <mo>&#x2264;</mo>
+          <mn>2</mn>
+          <mtext>exp</mtext><mo>(</mo>
+          <mo>&#x2212;</mo>
+          <mfrac><mrow><mn>2</mn><msup><mi>n</mi><mn>1</mn></msup><msup><mi>t</mi><mn>2</mn></msup></mrow><mrow><msup><mrow><mo>(</mo><mi>b</mi><mo>&#x2212;</mo><mi>a</mi><mo>)</mo></mrow><mn>2</mn></msup></mrow></mfrac>
+          <mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Exponential tail bound &mdash; much sharper than Chebyshev.</li>
+        <li>Justifies why sample means concentrate rapidly around their expected values, and gives finite-sample generalization bounds in PAC learning.</li>
+        <li>Chernoff and Bernstein bounds are related tools; use Bernstein when variance is small compared to the range.</li>
+      </ul>`,
+    src: "Boucheron, Lugosi & Massart — Concentration Inequalities",
+    url: "https://global.oup.com/academic/product/concentration-inequalities-9780199535255"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is Simpson's paradox, and what does it teach about aggregating data?",
+    body: `
+      <p class="answer">A trend that appears in each subgroup can disappear or reverse when the subgroups are pooled.</p>
+      <ul class="points">
+        <li>Classic example (Berkeley 1973 admissions): department-by-department admission rates favored women, but pooled data showed men admitted at higher rates &mdash; because more women applied to competitive departments.</li>
+        <li>Root cause: a confounder (department competitiveness) is correlated with both the treatment (gender) and the outcome (admission).</li>
+        <li>The "correct" answer depends on the causal question, not the statistics. To answer "would flipping gender change admission?", condition on the confounder; to answer "what's the overall rate?", don't.</li>
+      </ul>`,
+    src: "Pearl — Causality (§6)",
+    url: "https://bayes.cs.ucla.edu/BOOK-2K/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is confounding, and what tools do we have to handle it?",
+    body: `
+      <p class="answer">A confounder is a variable that causes both the treatment and the outcome, creating a spurious association between them.</p>
+      <ul class="points">
+        <li><strong>RCT</strong> &mdash; randomization breaks the causal link from confounders to treatment. The gold standard.</li>
+        <li><strong>Conditioning / stratification</strong> &mdash; adjust for known confounders by including them as covariates (Pearl's back-door adjustment).</li>
+        <li><strong>Propensity score matching</strong> &mdash; pair treated and untreated units with similar covariate profiles.</li>
+        <li><strong>Instrumental variables</strong> &mdash; find something that affects treatment but affects outcome only through treatment.</li>
+        <li>All observational methods depend on <strong>no unmeasured confounders</strong> &mdash; an assumption you can't fully test.</li>
+      </ul>`,
+    src: "Pearl — Causality; Hern&aacute;n & Robins — Causal Inference",
+    url: "https://miguelhernan.org/causalinferencebook/"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What is Bayesian model averaging, and how does it differ from picking the best model?",
+    body: `
+      <p class="answer">Instead of selecting a single model, average predictions weighted by each model's posterior probability given the data:</p>
+      <div class="eq">
+        <math display="block">
+          <mi>p</mi><mo>(</mo><msub><mi>y</mi><mtext>new</mtext></msub><mo>|</mo><mi>D</mi><mo>)</mo>
+          <mo>=</mo>
+          <munder><mo>&#x2211;</mo><msub><mi>M</mi><mi>k</mi></msub></munder>
+          <mi>p</mi><mo>(</mo><msub><mi>y</mi><mtext>new</mtext></msub><mo>|</mo><msub><mi>M</mi><mi>k</mi></msub><mo>,</mo><mi>D</mi><mo>)</mo>
+          <mi>p</mi><mo>(</mo><msub><mi>M</mi><mi>k</mi></msub><mo>|</mo><mi>D</mi><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Accounts for model uncertainty explicitly. Better calibrated than picking the MAP model.</li>
+        <li>Requires computing marginal likelihoods p(D|M<sub>k</sub>), which is often the hard part &mdash; use approximations (BIC, WAIC, LOO-CV).</li>
+        <li>The most probable model can still be wrong; averaging hedges against that.</li>
+      </ul>`,
+    src: "Hoeting et al. — Bayesian Model Averaging: A Tutorial",
+    url: "https://www.jstor.org/stable/2676803"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "What are copulas, and why care about them?",
+    body: `
+      <p class="answer">A <strong>copula</strong> is a joint distribution on [0,1]<sup>d</sup> with uniform marginals. Sklar's theorem: any multivariate distribution can be factored into its marginal distributions plus a copula that captures the dependence structure alone.</p>
+      <ul class="points">
+        <li>Cleanly separates "what each variable looks like on its own" from "how they move together" &mdash; you can pair any marginals with any copula.</li>
+        <li>Correlation captures only linear dependence; copulas capture the full joint dependence, including tail behavior.</li>
+        <li>Central to quantitative finance for modeling co-movements of asset returns &mdash; and the Gaussian copula's underestimation of tail dependence is a piece of the 2008 crisis story.</li>
+      </ul>`,
+    src: "Nelsen — An Introduction to Copulas",
+    url: "https://link.springer.com/book/10.1007/0-387-28678-0"
+  },
+  {
+    cat: "Probability & Stats",
+    q: "When to use t-test, chi-squared, ANOVA, and Kolmogorov-Smirnov?",
+    body: `
+      <ul class="points">
+        <li><strong>t-test</strong> &mdash; compare two group means with continuous data. Assumes approximate normality; use Welch's t-test (unequal variances) by default. For non-normal or ordinal data, use Mann-Whitney U.</li>
+        <li><strong>Chi-squared</strong> &mdash; test independence of two categorical variables in a contingency table. Requires expected cell counts &gt; 5; use Fisher's exact for small samples.</li>
+        <li><strong>ANOVA</strong> &mdash; compare three or more group means. F-statistic on between-group vs within-group variance. Post-hoc tests (Tukey HSD) needed to find <em>which</em> pairs differ.</li>
+        <li><strong>KS test</strong> &mdash; compare two full distributions (not just means). Non-parametric; sensitive to any distributional difference. Common for detecting data drift in ML monitoring.</li>
+      </ul>
+      <p class="answer">All classical tests carry assumptions; when in doubt (small n, weird distributions), the bootstrap gives a nearly-assumption-free alternative.</p>`,
+    src: "Wasserman — All of Statistics (Ch. 10)",
+    url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
   },
 
   /* ===================== DEEP LEARNING ===================== */
@@ -1951,6 +3230,687 @@ const CARDS = [
       <p class="answer">The <em>min</em> of clipped and unclipped terms is a pessimistic lower bound, giving TRPO-like stability with simple first-order optimization. Typically &#x03B5; &#x2248; 0.2. It's the workhorse RL algorithm behind RLHF.</p>`,
     src: "Schulman et al. — Proximal Policy Optimization (2017)",
     url: "https://arxiv.org/abs/1707.06347"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is the exploration&ndash;exploitation dilemma?",
+    body: `
+      <ul class="points">
+        <li><strong>Exploitation</strong> &mdash; take the action currently believed to be best. Guaranteed reward from what you know.</li>
+        <li><strong>Exploration</strong> &mdash; try other actions to gather information about their value. Necessary because early estimates are noisy and the optimal action might not be the one that looked best in the first few tries.</li>
+        <li>The trade-off is fundamental: pure exploitation gets stuck on locally-good actions; pure exploration never cashes in on knowledge.</li>
+        <li>Bandit theory quantifies the cost via <strong>regret</strong> &mdash; the gap between an oracle that always plays the best arm and the agent's actual reward.</li>
+      </ul>`,
+    src: "Sutton & Barto — RL: An Introduction (Ch. 2)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is a multi-armed bandit, and what does regret measure?",
+    body: `
+      <p class="answer">K slot machines with unknown reward distributions. Each round, pick one and observe its reward. Goal: maximize cumulative reward over T rounds.</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>R</mi><mi>T</mi></msub>
+          <mo>=</mo>
+          <mi>T</mi><mo>&#x22C5;</mo><msub><mi>&#x03BC;</mi><mo>&#x22C6;</mo></msub>
+          <mo>&#x2212;</mo>
+          <munderover><mo>&#x2211;</mo><mrow><mi>t</mi><mo>=</mo><mn>1</mn></mrow><mi>T</mi></munderover>
+          <mi>&#x1D53C;</mi><mo>[</mo><msub><mi>r</mi><mi>t</mi></msub><mo>]</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>&#x03BC;<sub>&#x22C6;</sub> is the mean of the best arm.</li>
+        <li>Optimal algorithms achieve O(log T) regret &mdash; sublinear, meaning average reward &rarr; &#x03BC;<sub>&#x22C6;</sub>.</li>
+        <li>&#x03B5;-greedy has linear regret unless &#x03B5; decays; UCB and Thompson sampling achieve O(log T).</li>
+        <li>Simplest instance of the RL problem: one state, no dynamics, still non-trivial.</li>
+      </ul>`,
+    src: "Lattimore & Szepesv&aacute;ri — Bandit Algorithms",
+    url: "https://banditalgs.com/"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "How does UCB work, and why is it optimal for stochastic bandits?",
+    body: `
+      <p class="answer">Upper Confidence Bound: pick the arm with the highest optimistic estimate of its mean reward.</p>
+      <div class="eq">
+        <math display="block">
+          <msub><mi>a</mi><mi>t</mi></msub>
+          <mo>=</mo>
+          <munder><mi>argmax</mi><mi>a</mi></munder>
+          <mo>[</mo>
+          <msub><mover><mi>&#x03BC;</mi><mo>^</mo></mover><mi>a</mi></msub>
+          <mo>+</mo>
+          <msqrt><mfrac><mrow><mn>2</mn><mi>log</mi><mi>t</mi></mrow><msub><mi>n</mi><mi>a</mi></msub></mfrac></msqrt>
+          <mo>]</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>"Optimism in the face of uncertainty" &mdash; the bonus &#x221A;(log t / n<sub>a</sub>) shrinks as an arm is pulled more.</li>
+        <li>Guarantees a Hoeffding-style upper bound on the mean holds with high probability, so playing UCB explores arms whose <em>plausible</em> best value is highest.</li>
+        <li>Regret is O(&#x2211;<sub>a &#x2260; a*</sub> log T / &#x0394;<sub>a</sub>) &mdash; matches the Lai-Robbins lower bound up to constants.</li>
+      </ul>`,
+    src: "Auer et al. — Finite-time Analysis of the Multiarmed Bandit Problem",
+    url: "https://link.springer.com/article/10.1023/A:1013689704352"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is Thompson sampling, and how does it explore?",
+    body: `
+      <p class="answer">Maintain a posterior over each arm's reward parameter. Each round, <strong>sample</strong> a parameter for each arm, then pick the arm with the highest sampled mean.</p>
+      <ul class="points">
+        <li>Exploration comes for free from posterior uncertainty: arms with wide posteriors sometimes sample high &mdash; getting pulled and updated.</li>
+        <li>For Bernoulli bandits, use Beta(&#x03B1;+successes, &#x03B2;+failures) posteriors; sample p and pick argmax.</li>
+        <li>Empirically strong; often beats UCB in practice and has clean Bayesian regret bounds.</li>
+        <li>Extends naturally to contextual bandits with a linear or neural posterior.</li>
+      </ul>`,
+    src: "Russo et al. — A Tutorial on Thompson Sampling",
+    url: "https://arxiv.org/abs/1707.02038"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What are contextual bandits, and where do they fit between bandits and full RL?",
+    body: `
+      <p class="answer">Each round, observe a context x<sub>t</sub>, choose an action, receive reward r(x<sub>t</sub>, a<sub>t</sub>). Actions don't affect future contexts.</p>
+      <ul class="points">
+        <li>Middle ground: like bandits but the best action depends on context (news article recommendations by user, ad by session).</li>
+        <li>Unlike full RL, one action doesn't change the next state's distribution &mdash; so no long-horizon credit assignment.</li>
+        <li>LinUCB, Thompson sampling with a linear model, and neural bandits are the standard tools.</li>
+        <li>Widely used in production personalization; simpler to deploy safely than full RL because reward feedback is immediate.</li>
+      </ul>`,
+    src: "Li et al. — A Contextual-Bandit Approach to Personalized News Article Recommendation",
+    url: "https://arxiv.org/abs/1003.0146"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "Define the return G<sub>t</sub> and explain the discount factor &#x03B3;.",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <msub><mi>G</mi><mi>t</mi></msub>
+          <mo>=</mo>
+          <munderover><mo>&#x2211;</mo><mrow><mi>k</mi><mo>=</mo><mn>0</mn></mrow><mi>&#x221E;</mi></munderover>
+          <msup><mi>&#x03B3;</mi><mi>k</mi></msup>
+          <msub><mi>r</mi><mrow><mi>t</mi><mo>+</mo><mi>k</mi><mo>+</mo><mn>1</mn></mrow></msub>
+        </math>
+      </div>
+      <ul class="points">
+        <li>&#x03B3; &#x2208; [0, 1). At &#x03B3; = 0 the agent is myopic; near &#x03B3; = 1 it values long-term reward equally with immediate.</li>
+        <li>Ensures the sum converges in infinite-horizon problems even when reward is unbounded.</li>
+        <li>Interpretations: probability of not terminating each step; economic time-value of reward; a cheap regularizer against reward-hacking distant states.</li>
+        <li>Effective horizon &#x2248; 1/(1&minus;&#x03B3;). &#x03B3; = 0.99 means the agent cares about roughly the next 100 steps.</li>
+      </ul>`,
+    src: "Sutton & Barto — RL (Ch. 3)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "V<sup>&#x03C0;</sup>(s) vs Q<sup>&#x03C0;</sup>(s, a) &mdash; what's the difference, and when do you use each?",
+    body: `
+      <ul class="points">
+        <li><strong>V<sup>&#x03C0;</sup>(s)</strong> &mdash; expected return from state s, following &#x03C0; from then on.</li>
+        <li><strong>Q<sup>&#x03C0;</sup>(s, a)</strong> &mdash; expected return after taking action a in state s, then following &#x03C0;.</li>
+        <li>Relation: V<sup>&#x03C0;</sup>(s) = &#x2211;<sub>a</sub> &#x03C0;(a|s) Q<sup>&#x03C0;</sup>(s, a).</li>
+        <li>Use <strong>Q</strong> when you need to pick the best action without a model of P(s'|s, a) &mdash; e.g., Q-learning, DQN. Just argmax.</li>
+        <li>Use <strong>V</strong> as a baseline in policy-gradient methods to reduce variance without changing the expected gradient.</li>
+      </ul>`,
+    src: "Sutton & Barto — RL (§3.5)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is the advantage function A(s, a), and why is it useful?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <msup><mi>A</mi><mi>&#x03C0;</mi></msup><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo>
+          <mo>=</mo>
+          <msup><mi>Q</mi><mi>&#x03C0;</mi></msup><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo>
+          <mo>&#x2212;</mo>
+          <msup><mi>V</mi><mi>&#x03C0;</mi></msup><mo>(</mo><mi>s</mi><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>How much better (or worse) is action a compared to the average action at state s under &#x03C0;.</li>
+        <li>Zero-mean under &#x03C0; by construction &mdash; subtracting V acts as a variance-reducing baseline for policy gradients without introducing bias.</li>
+        <li>Central to actor-critic algorithms: the critic learns V (or Q&minus;V), and the actor is updated using the advantage.</li>
+        <li>Advantage estimates can be noisy from few samples; GAE (Generalized Advantage Estimation) trades bias for variance smoothly.</li>
+      </ul>`,
+    src: "Baird — Advantage Updating; Sutton & Barto — RL (§13.4)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "Write the optimal Bellman equation for Q*. How does it lead to Q-learning?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <msup><mi>Q</mi><mo>&#x22C6;</mo></msup><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo>
+          <mo>=</mo>
+          <mi>&#x1D53C;</mi><mo>[</mo><mi>r</mi>
+          <mo>+</mo>
+          <mi>&#x03B3;</mi>
+          <munder><mi>max</mi><msup><mi>a</mi><mo>&#x2032;</mo></msup></munder>
+          <msup><mi>Q</mi><mo>&#x22C6;</mo></msup><mo>(</mo><msup><mi>s</mi><mo>&#x2032;</mo></msup><mo>,</mo><msup><mi>a</mi><mo>&#x2032;</mo></msup><mo>)</mo>
+          <mo>&#x2223;</mo><mi>s</mi><mo>,</mo><mi>a</mi>
+          <mo>]</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Q* is a fixed point of the Bellman optimality operator, which is a contraction under sup-norm &mdash; guarantees a unique solution.</li>
+        <li>Q-learning turns this into a stochastic-approximation update: nudge Q(s, a) toward the sample target r + &#x03B3; max<sub>a'</sub> Q(s', a').</li>
+        <li>The <em>max</em> makes it off-policy: the target uses the greedy policy regardless of the behavior policy that generated the data.</li>
+      </ul>`,
+    src: "Sutton & Barto — RL (§3.6, §6.5)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "Compare policy iteration and value iteration for solving a known MDP.",
+    body: `
+      <ul class="points">
+        <li><strong>Policy iteration</strong> alternates: (1) policy evaluation &mdash; solve V<sup>&#x03C0;</sup> for the current &#x03C0;, typically via iterative Bellman updates until convergence; (2) policy improvement &mdash; greedy-update &#x03C0; using V<sup>&#x03C0;</sup>. Converges in a finite number of iterations for finite MDPs.</li>
+        <li><strong>Value iteration</strong> collapses these: apply the Bellman optimality update V &larr; max<sub>a</sub> [r + &#x03B3; E[V(s')]] until convergence, then extract the greedy policy at the end.</li>
+        <li>PI does more per iteration (a full evaluation) but converges in fewer outer steps.</li>
+        <li>Both assume a known model P and R &mdash; they're planning, not learning. Model-free methods approximate them from samples.</li>
+      </ul>`,
+    src: "Sutton & Barto — RL (§4.3, §4.4)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "Monte Carlo vs Temporal Difference &mdash; what's the trade-off?",
+    body: `
+      <ul class="points">
+        <li><strong>MC</strong> &mdash; wait until the episode ends, then update V(s) toward the actual observed return G. Unbiased; high variance; needs episodic tasks.</li>
+        <li><strong>TD(0)</strong> &mdash; bootstrap: update V(s) toward r + &#x03B3; V(s'). Uses the current estimate of V as a proxy for future return.</li>
+        <li>TD is <em>biased</em> (V is an estimate) but <em>lower variance</em>. Works online, learns from incomplete episodes, and typically converges faster.</li>
+        <li>n-step TD and TD(&#x03BB;) blend MC and TD(0): trade bias against variance smoothly.</li>
+      </ul>`,
+    src: "Sutton & Barto — RL (Ch. 5, 6)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is TD(&#x03BB;), and what do eligibility traces do?",
+    body: `
+      <p class="answer">TD(&#x03BB;) is a weighted mix of n-step TD backups. The eligibility trace e<sub>t</sub>(s) tracks recently-visited states, decaying at rate &#x03B3;&#x03BB;.</p>
+      <div class="eq">
+        <math display="block">
+          <mi>V</mi><mo>(</mo><mi>s</mi><mo>)</mo><mo>&larr;</mo>
+          <mi>V</mi><mo>(</mo><mi>s</mi><mo>)</mo>
+          <mo>+</mo>
+          <mi>&#x03B1;</mi>
+          <mi>&#x03B4;</mi>
+          <msub><mi>e</mi><mi>t</mi></msub><mo>(</mo><mi>s</mi><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>&#x03BB; = 0 recovers TD(0); &#x03BB; = 1 recovers MC. Intermediate &#x03BB; often works best.</li>
+        <li>Eligibility traces propagate TD errors back through recent states in a single update, dramatically speeding credit assignment.</li>
+        <li>Modern deep RL usually replaces traces with fixed n-step returns or GAE, but the principle is the same.</li>
+      </ul>`,
+    src: "Sutton & Barto — RL (Ch. 12)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "SARSA vs Q-learning &mdash; what's the difference?",
+    body: `
+      <ul class="points">
+        <li><strong>SARSA</strong> (on-policy): target is Q(s, a) &larr; r + &#x03B3; Q(s', a'), where a' is the action <em>actually taken</em> by the current policy.</li>
+        <li><strong>Q-learning</strong> (off-policy): target is Q(s, a) &larr; r + &#x03B3; max<sub>a'</sub> Q(s', a'), regardless of what was actually taken.</li>
+      </ul>
+      <p class="answer">Practical difference: SARSA learns a safer policy in the presence of exploration noise (it accounts for the exploratory action it will actually take). Q-learning learns the greedy policy directly, so with &#x03B5;-greedy behavior it can be more aggressive but also more likely to fall off cliffs (Sutton's cliff-walking example).</p>`,
+    src: "Sutton & Barto — RL (§6.4, §6.5)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is Expected SARSA, and why can it beat both SARSA and Q-learning?",
+    body: `
+      <p class="answer">Instead of using the sampled next action a' or the greedy max, take the expectation of Q under the current policy:</p>
+      <div class="eq">
+        <math display="block">
+          <mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo>
+          <mo>&larr;</mo>
+          <mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo>
+          <mo>+</mo>
+          <mi>&#x03B1;</mi>
+          <mo>[</mo>
+          <mi>r</mi>
+          <mo>+</mo>
+          <mi>&#x03B3;</mi>
+          <munder><mo>&#x2211;</mo><msup><mi>a</mi><mo>&#x2032;</mo></msup></munder>
+          <mi>&#x03C0;</mi><mo>(</mo><msup><mi>a</mi><mo>&#x2032;</mo></msup><mo>|</mo><msup><mi>s</mi><mo>&#x2032;</mo></msup><mo>)</mo>
+          <mi>Q</mi><mo>(</mo><msup><mi>s</mi><mo>&#x2032;</mo></msup><mo>,</mo><msup><mi>a</mi><mo>&#x2032;</mo></msup><mo>)</mo>
+          <mo>&#x2212;</mo><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo>
+          <mo>]</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Same expected update as SARSA, but zero variance from the choice of a'.</li>
+        <li>Recovers Q-learning if &#x03C0; is greedy in the target.</li>
+        <li>Usually more stable than SARSA at comparable compute cost.</li>
+      </ul>`,
+    src: "van Seijen et al. — A Theoretical and Empirical Analysis of Expected Sarsa",
+    url: "https://webdocs.cs.ualberta.ca/~sutton/papers/vSHSW-2009.pdf"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "Why does Q-learning overestimate values, and how does Double Q-learning fix it?",
+    body: `
+      <p class="answer">The <em>max</em> operator in Q-learning's target introduces upward bias: max E[Q&#x0302;] &ge; E[max Q&#x0302;] (Jensen's inequality). Noisy Q estimates produce systematically inflated targets.</p>
+      <ul class="points">
+        <li><strong>Double Q-learning</strong>: keep two Q networks. Use one to select the greedy action a*, the other to evaluate its value: target = r + &#x03B3; Q<sub>B</sub>(s', argmax<sub>a'</sub> Q<sub>A</sub>(s', a')).</li>
+        <li>Decouples the max, roughly eliminating the overestimation bias.</li>
+        <li>In DQN, this becomes Double DQN: use the online network to pick actions, the target network to score them.</li>
+      </ul>`,
+    src: "Hasselt et al. — Deep Reinforcement Learning with Double Q-learning",
+    url: "https://arxiv.org/abs/1509.06461"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is Fitted Q-Iteration (FQI)?",
+    body: `
+      <ul class="points">
+        <li>Batch, off-policy value learning. Collect a dataset of (s, a, r, s') transitions once, then iterate:</li>
+        <li>At iteration k, treat the current Q<sub>k</sub> as fixed and compute targets y<sub>i</sub> = r<sub>i</sub> + &#x03B3; max<sub>a'</sub> Q<sub>k</sub>(s'<sub>i</sub>, a').</li>
+        <li>Regress a new function approximator Q<sub>k+1</sub> to fit (s<sub>i</sub>, a<sub>i</sub>) &rarr; y<sub>i</sub> using any supervised learner (trees, kernels, neural nets).</li>
+        <li>Repeat until Q converges.</li>
+      </ul>
+      <p class="answer">Doesn't need interaction with the environment during training &mdash; useful for offline / batch RL settings where a fixed logged dataset is all you have. DQN is essentially online FQI with a target network and replay buffer.</p>`,
+    src: "Ernst, Geurts & Wehenkel — Tree-Based Batch Mode Reinforcement Learning",
+    url: "https://www.jmlr.org/papers/v6/ernst05a.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "How does Deep Q-Network (DQN) work? Two innovations that made it stable.",
+    body: `
+      <p class="answer">Parameterize Q(s, a; &#x03B8;) as a neural net; train by minimizing MSE between predicted Q and target r + &#x03B3; max<sub>a'</sub> Q(s', a'; &#x03B8;<sup>&#x2212;</sup>).</p>
+      <ul class="points">
+        <li><strong>Replay buffer</strong> &mdash; store transitions and sample minibatches uniformly. Decorrelates samples and gives supervised-like i.i.d. behavior.</li>
+        <li><strong>Target network</strong> Q(&sdot;; &#x03B8;<sup>&#x2212;</sup>) &mdash; a lagged copy of Q, updated every C steps. Prevents the target from moving with the parameters and causing feedback instability.</li>
+        <li>Reward clipping, frame stacking, and CNN feature extraction round out the original Atari-scale recipe.</li>
+      </ul>`,
+    src: "Mnih et al. — Human-level control through deep reinforcement learning",
+    url: "https://www.nature.com/articles/nature14236"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is prioritized experience replay?",
+    body: `
+      <p class="answer">Sample from the replay buffer weighted by the magnitude of each transition's <strong>TD error</strong> instead of uniformly.</p>
+      <ul class="points">
+        <li>Transitions with high &#x03B4; carry more learning signal &mdash; sampling them more often speeds up training.</li>
+        <li>Introduces bias: high-error transitions are over-represented. Fix with importance-sampling weights when computing the loss.</li>
+        <li>Priorities are updated online as TD errors change; use a proportional or rank-based scheme with a sum-tree for O(log n) sampling.</li>
+        <li>Consistent improvements on DQN benchmarks; part of Rainbow's stack.</li>
+      </ul>`,
+    src: "Schaul et al. — Prioritized Experience Replay",
+    url: "https://arxiv.org/abs/1511.05952"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is Rainbow DQN made of?",
+    body: `
+      <p class="answer">A combination of six independent DQN improvements that, when stacked, give SOTA on Atari.</p>
+      <ul class="points">
+        <li><strong>Double Q-learning</strong> &mdash; fights value overestimation.</li>
+        <li><strong>Prioritized replay</strong> &mdash; sample high-TD-error transitions more often.</li>
+        <li><strong>Dueling networks</strong> &mdash; split Q into V(s) + A(s, a); helps when action choice doesn't matter much.</li>
+        <li><strong>Multi-step (n-step) returns</strong> &mdash; propagate rewards faster than 1-step TD.</li>
+        <li><strong>Distributional RL (C51)</strong> &mdash; learn the full distribution of returns, not just the mean.</li>
+        <li><strong>Noisy nets</strong> &mdash; parametric exploration by adding learnable noise to weights (replaces &#x03B5;-greedy).</li>
+      </ul>`,
+    src: "Hessel et al. — Rainbow: Combining Improvements in Deep RL",
+    url: "https://arxiv.org/abs/1710.02298"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is an actor-critic algorithm?",
+    body: `
+      <p class="answer">Simultaneously train two networks: an <strong>actor</strong> that outputs a stochastic (or deterministic) policy, and a <strong>critic</strong> that estimates V or Q.</p>
+      <ul class="points">
+        <li>Actor is updated via policy gradient with the critic's advantage estimate as the coefficient &mdash; A(s, a) has much lower variance than raw returns.</li>
+        <li>Critic is updated via TD toward bootstrapped targets.</li>
+        <li>Combines strengths: policy methods handle continuous action spaces natively; value methods learn efficiently from bootstrapping.</li>
+        <li>Foundation for A2C/A3C, DDPG, SAC, PPO &mdash; essentially every modern deep-RL algorithm.</li>
+      </ul>`,
+    src: "Sutton & Barto — RL (§13.5)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "A3C vs A2C &mdash; what's the difference?",
+    body: `
+      <ul class="points">
+        <li><strong>A3C</strong> (Asynchronous Advantage Actor-Critic) &mdash; many worker threads each interact with their own env copy, compute gradients, and asynchronously update a shared central network. Diversity of experience decorrelates gradients without a replay buffer.</li>
+        <li><strong>A2C</strong> &mdash; synchronous version: workers step in lockstep, gradients are averaged, one update per batch. Simpler; better GPU utilization.</li>
+        <li>Empirically A2C matches or beats A3C. Asynchrony was more useful when hardware favored CPU workers; on GPU, batched synchronous updates win.</li>
+      </ul>`,
+    src: "Mnih et al. — Asynchronous Methods for Deep RL (A3C)",
+    url: "https://arxiv.org/abs/1602.01783"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "How does DDPG handle continuous action spaces?",
+    body: `
+      <p class="answer">Deterministic Policy Gradient + deep networks: the actor outputs a single deterministic action &#x03BC;(s), and the critic Q(s, a) is differentiable in a.</p>
+      <ul class="points">
+        <li>Actor update: &#x2207;<sub>&#x03B8;</sub> J = E[&#x2207;<sub>a</sub> Q(s, a) &sdot; &#x2207;<sub>&#x03B8;</sub> &#x03BC;(s)] evaluated at a = &#x03BC;(s).</li>
+        <li>Off-policy with a replay buffer &mdash; can reuse old data.</li>
+        <li>Target networks (soft-updated with Polyak averaging) stabilize learning as in DQN.</li>
+        <li>Exploration by adding time-correlated noise (Ornstein-Uhlenbeck or Gaussian) to actions.</li>
+        <li>Notoriously brittle to hyperparameters &mdash; TD3 and SAC fix its main failure modes.</li>
+      </ul>`,
+    src: "Lillicrap et al. — Continuous Control with Deep Reinforcement Learning",
+    url: "https://arxiv.org/abs/1509.02971"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What three tricks does TD3 add to DDPG, and why?",
+    body: `
+      <ul class="points">
+        <li><strong>Twin critics</strong> &mdash; keep two Q networks and use the minimum for the target. Fights DDPG's chronic Q-value overestimation.</li>
+        <li><strong>Delayed policy updates</strong> &mdash; update the actor once every d critic updates. Lets Q settle before the policy chases it.</li>
+        <li><strong>Target policy smoothing</strong> &mdash; add small clipped noise to the target action. Regularizes the value estimate against exploitation of narrow Q peaks.</li>
+      </ul>
+      <p class="answer">Together, these turn DDPG from a fragile algorithm into a robust one. TD3 became a standard baseline for continuous control before SAC largely replaced it.</p>`,
+    src: "Fujimoto et al. — Addressing Function Approximation Error in Actor-Critic Methods (TD3)",
+    url: "https://arxiv.org/abs/1802.09477"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What does SAC's max-entropy objective add on top of standard RL?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <mi>J</mi><mo>(</mo><mi>&#x03C0;</mi><mo>)</mo>
+          <mo>=</mo>
+          <munder><mo>&#x2211;</mo><mi>t</mi></munder>
+          <mi>&#x1D53C;</mi><mo>[</mo><mi>r</mi><mo>(</mo><msub><mi>s</mi><mi>t</mi></msub><mo>,</mo><msub><mi>a</mi><mi>t</mi></msub><mo>)</mo>
+          <mo>+</mo>
+          <mi>&#x03B1;</mi>
+          <mi>H</mi><mo>(</mo><mi>&#x03C0;</mi><mo>(</mo><mo>&#x22C5;</mo><mo>|</mo><msub><mi>s</mi><mi>t</mi></msub><mo>)</mo><mo>)</mo>
+          <mo>]</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Add the policy's entropy H(&#x03C0;) to the reward &mdash; the optimal policy is <em>as random as possible</em> while still collecting reward.</li>
+        <li>Automatic exploration: high-entropy regions get bonus reward, so the policy spreads its bets over near-optimal actions.</li>
+        <li>Robust: entropy regularization has a smoothing effect that stabilizes learning and reduces sensitivity to hyperparameters.</li>
+        <li>The temperature &#x03B1; is typically auto-tuned to hit a target entropy. Off-policy, sample-efficient, standard for continuous control.</li>
+      </ul>`,
+    src: "Haarnoja et al. — Soft Actor-Critic",
+    url: "https://arxiv.org/abs/1801.01290"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is TRPO's trust-region idea?",
+    body: `
+      <p class="answer">Maximize a surrogate advantage subject to a hard constraint on how far the new policy can move from the old one, measured in KL divergence:</p>
+      <div class="eq">
+        <math display="block">
+          <munder><mi>max</mi><mi>&#x03B8;</mi></munder>
+          <mi>&#x1D53C;</mi>
+          <mfenced><mrow>
+            <mfrac><mrow><msub><mi>&#x03C0;</mi><mi>&#x03B8;</mi></msub><mo>(</mo><mi>a</mi><mo>|</mo><mi>s</mi><mo>)</mo></mrow><mrow><msub><mi>&#x03C0;</mi><mtext>old</mtext></msub><mo>(</mo><mi>a</mi><mo>|</mo><mi>s</mi><mo>)</mo></mrow></mfrac>
+            <mover><mi>A</mi><mo>^</mo></mover>
+          </mrow></mfenced>
+          <mspace width="1em"/>
+          <mtext>s.t.&nbsp;</mtext>
+          <mi>&#x1D53C;</mi><mo>[</mo>
+          <mtext>KL</mtext><mo>(</mo><msub><mi>&#x03C0;</mi><mtext>old</mtext></msub><mo>&#x2016;</mo><msub><mi>&#x03C0;</mi><mi>&#x03B8;</mi></msub><mo>)</mo>
+          <mo>]</mo>
+          <mo>&#x2264;</mo>
+          <mi>&#x03B4;</mi>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Motivation: naive large policy-gradient steps destabilize training. A KL trust region provably guarantees monotonic policy improvement (Schulman et al.).</li>
+        <li>Solved with conjugate gradient + line search &mdash; expensive per step.</li>
+        <li>PPO replaced TRPO because its clip trick gives similar stability at a fraction of the compute.</li>
+      </ul>`,
+    src: "Schulman et al. — Trust Region Policy Optimization (TRPO)",
+    url: "https://arxiv.org/abs/1502.05477"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is Generalized Advantage Estimation (GAE)?",
+    body: `
+      <p class="answer">Estimate the advantage as an exponentially weighted average of n-step TD errors:</p>
+      <div class="eq">
+        <math display="block">
+          <msubsup><mover><mi>A</mi><mo>^</mo></mover><mi>t</mi><mtext>GAE</mtext></msubsup>
+          <mo>=</mo>
+          <munderover><mo>&#x2211;</mo><mrow><mi>l</mi><mo>=</mo><mn>0</mn></mrow><mi>&#x221E;</mi></munderover>
+          <msup><mrow><mo>(</mo><mi>&#x03B3;</mi><mi>&#x03BB;</mi><mo>)</mo></mrow><mi>l</mi></msup>
+          <msub><mi>&#x03B4;</mi><mrow><mi>t</mi><mo>+</mo><mi>l</mi></mrow></msub>
+        </math>
+      </div>
+      <ul class="points">
+        <li>&#x03B4;<sub>t</sub> = r<sub>t</sub> + &#x03B3;V(s<sub>t+1</sub>) &minus; V(s<sub>t</sub>) is the 1-step TD error.</li>
+        <li>&#x03BB; = 0: pure TD(0) (low variance, biased). &#x03BB; = 1: pure MC advantage (unbiased, high variance).</li>
+        <li>Practical sweet spot: &#x03BB; &#x2248; 0.95 &mdash; small bias for a big variance reduction. Used with PPO in nearly all modern continuous-control benchmarks.</li>
+      </ul>`,
+    src: "Schulman et al. — High-Dimensional Continuous Control Using Generalized Advantage Estimation",
+    url: "https://arxiv.org/abs/1506.02438"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is the natural policy gradient?",
+    body: `
+      <p class="answer">Standard PG uses Euclidean geometry on parameters. A small step in &#x03B8; can correspond to a huge policy change. Natural PG rescales the gradient by the inverse Fisher information matrix:</p>
+      <div class="eq">
+        <math display="block">
+          <mo>&#x0394;</mo><mi>&#x03B8;</mi>
+          <mo>=</mo>
+          <mi>&#x03B7;</mi>
+          <msup><mi>F</mi><mrow><mo>&#x2212;</mo><mn>1</mn></mrow></msup>
+          <mo>&#x2207;</mo><mi>J</mi><mo>(</mo><mi>&#x03B8;</mi><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Fisher F is the Hessian of the KL divergence at 0 &mdash; step size is measured in KL, not Euclidean distance.</li>
+        <li>Result: invariant to reparameterization, larger stable steps.</li>
+        <li>TRPO can be viewed as a constrained natural gradient step; PPO approximates it with a clipping surrogate.</li>
+      </ul>`,
+    src: "Kakade — A Natural Policy Gradient",
+    url: "https://papers.nips.cc/paper/2001/hash/4b86abe48d358ecf194c56c69108433e-Abstract.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "On-policy vs off-policy &mdash; what does each mean, and what's the trade-off?",
+    body: `
+      <ul class="points">
+        <li><strong>On-policy</strong> &mdash; the data used to update the policy was generated by the current policy (SARSA, REINFORCE, A2C, PPO). Simple; wastes data because every gradient step invalidates the buffer.</li>
+        <li><strong>Off-policy</strong> &mdash; behavior policy that collected data differs from the target policy being updated (Q-learning, DQN, DDPG, SAC). Reuses data via replay buffers, so much more sample-efficient.</li>
+      </ul>
+      <p class="answer">Off-policy is essential when environment interaction is expensive (real robots, chemistry, education). But it's harder to make stable &mdash; correcting for the distribution mismatch (importance sampling, off-policy corrections) is the source of most algorithmic complexity.</p>`,
+    src: "Sutton & Barto — RL (§5.5, §6.5)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "How does importance sampling correct off-policy value estimates?",
+    body: `
+      <div class="eq">
+        <math display="block">
+          <msub><mi>&#x1D53C;</mi><mi>&#x03C0;</mi></msub><mo>[</mo><mi>f</mi><mo>(</mo><mi>a</mi><mo>)</mo><mo>]</mo>
+          <mo>=</mo>
+          <msub><mi>&#x1D53C;</mi><mi>&#x03BC;</mi></msub>
+          <mfenced><mrow><mfrac><mrow><mi>&#x03C0;</mi><mo>(</mo><mi>a</mi><mo>|</mo><mi>s</mi><mo>)</mo></mrow><mrow><mi>&#x03BC;</mi><mo>(</mo><mi>a</mi><mo>|</mo><mi>s</mi><mo>)</mo></mrow></mfrac>
+          <mi>f</mi><mo>(</mo><mi>a</mi><mo>)</mo></mrow></mfenced>
+        </math>
+      </div>
+      <ul class="points">
+        <li>Rescale samples from behavior policy &#x03BC; by the likelihood ratio to get an unbiased estimate under &#x03C0;.</li>
+        <li>Over a full trajectory the product of ratios is high variance &mdash; the "curse of horizon".</li>
+        <li>Mitigations: <strong>per-decision importance sampling</strong>, <strong>truncation / clipping</strong> (PPO's ratio clip is exactly this), <strong>weighted IS</strong>, or emphatic-TD methods.</li>
+      </ul>`,
+    src: "Precup et al. — Eligibility Traces for Off-Policy Policy Evaluation",
+    url: "https://scholarworks.umass.edu/cs_faculty_pubs/80/"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "Model-based vs model-free RL &mdash; when to choose each?",
+    body: `
+      <ul class="points">
+        <li><strong>Model-based</strong>: learn or use a model of P(s'|s, a) and R(s, a). Plan (VI, MCTS, MPC) or generate synthetic experience.</li>
+        <li><strong>Model-free</strong>: learn Q or &#x03C0; directly from real interaction. Simpler, more asymptotically expressive.</li>
+      </ul>
+      <p class="answer">Model-based wins on <strong>sample efficiency</strong> &mdash; a learned model amplifies each real transition into many planning steps. Loses when the model is inaccurate (compounding errors) or hard to learn (high-dim observations, complex physics). Model-free wins on <strong>final performance</strong> given unlimited data.</p>
+      <p class="answer">Modern hybrids: MuZero, Dreamer, MBPO &mdash; use learned models to accelerate model-free learning without trusting them to plan far into the future.</p>`,
+    src: "Sutton & Barto — RL (Ch. 8)",
+    url: "http://incompleteideas.net/book/the-book-2nd.html"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is Dyna-Q?",
+    body: `
+      <p class="answer">Learn a model P&#x0302;, R&#x0302; while doing standard Q-learning. Between real environment steps, perform k <em>simulated</em> Q-learning updates using transitions sampled from the model.</p>
+      <ul class="points">
+        <li>Each real step gives k+1 gradient updates &mdash; hugely more sample-efficient than pure Q-learning.</li>
+        <li>Model errors compound less than in long-horizon planning because Dyna uses only one-step simulated transitions per update.</li>
+        <li>Foundational for modern model-based deep RL &mdash; MBPO is basically Dyna-Q with a neural dynamics model.</li>
+      </ul>`,
+    src: "Sutton — Dyna, an Integrated Architecture for Learning, Planning, and Reacting",
+    url: "https://dl.acm.org/doi/10.1145/122344.122377"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "How do AlphaGo, AlphaZero, and MuZero differ?",
+    body: `
+      <ul class="points">
+        <li><strong>AlphaGo</strong> &mdash; policy and value networks pretrained on human games, then reinforced by self-play. Uses MCTS with the value net for leaf evaluation.</li>
+        <li><strong>AlphaZero</strong> &mdash; drop the human data. Learn purely from self-play + MCTS. Same idea applies to Go, chess, shogi with the same architecture. Requires a perfect known model of the game rules.</li>
+        <li><strong>MuZero</strong> &mdash; drop the known model. Learn a <em>latent dynamics model</em> that only needs to predict rewards, values, and policies (not observations). Plans in learned latent space.</li>
+      </ul>
+      <p class="answer">MuZero generalizes to games and Atari without hand-coded rules &mdash; the model doesn't need to be visually accurate, just useful for planning.</p>`,
+    src: "Schrittwieser et al. — Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model (MuZero)",
+    url: "https://arxiv.org/abs/1911.08265"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What are world models in RL (Dreamer)?",
+    body: `
+      <p class="answer">Learn a recurrent latent-dynamics model that predicts future latent states, rewards, and continuations from actions. Then train an actor-critic <strong>entirely in imagination</strong>.</p>
+      <ul class="points">
+        <li>Model: encoder + RSSM (recurrent state-space model) + reward/continuation heads. Trained by reconstructing observations and matching latent dynamics.</li>
+        <li>Actor and value networks trained by rolling the model forward from real latent states, backpropagating through many imagined steps.</li>
+        <li>Sample-efficient: solves Atari-scale tasks from far less environment interaction than model-free deep RL.</li>
+        <li>DreamerV3 (2023) reaches strong performance across 150+ tasks with a single hyperparameter setting.</li>
+      </ul>`,
+    src: "Hafner et al. — DreamerV3",
+    url: "https://arxiv.org/abs/2301.04104"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is hierarchical RL, and what are options?",
+    body: `
+      <p class="answer">Decompose long-horizon behavior into two levels: a <strong>meta-policy</strong> that chooses among temporally-extended sub-policies (options), and low-level sub-policies that execute them.</p>
+      <ul class="points">
+        <li>An <strong>option</strong> is a tuple (initiation set, sub-policy, termination condition) &mdash; a subroutine the agent can invoke.</li>
+        <li>The meta-policy sees a coarser, easier MDP: pick "go to kitchen", not "left, forward, forward, right".</li>
+        <li>Options can be handcrafted, learned end-to-end (option-critic), or discovered from data (subgoal-discovery methods).</li>
+        <li>Especially valuable for sparse-reward and long-horizon tasks; hard to make automatic option discovery robust.</li>
+      </ul>`,
+    src: "Sutton, Precup & Singh — Between MDPs and Semi-MDPs (Options)",
+    url: "https://people.cs.umass.edu/~barto/courses/cs687/Sutton-Precup-Singh-AIJ99.pdf"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is reward shaping, and what's a potential-based shaping guarantee?",
+    body: `
+      <p class="answer">Reward shaping adds an extra reward signal to make sparse-reward tasks tractable. Risky: bad shaping can change the optimal policy (e.g., reward-hacking a proxy).</p>
+      <div class="eq">
+        <math display="block">
+          <msup><mi>R</mi><mo>&#x2032;</mo></msup><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>,</mo><msup><mi>s</mi><mo>&#x2032;</mo></msup><mo>)</mo>
+          <mo>=</mo>
+          <mi>R</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>,</mo><msup><mi>s</mi><mo>&#x2032;</mo></msup><mo>)</mo>
+          <mo>+</mo>
+          <mi>&#x03B3;</mi><mi>&#x03A6;</mi><mo>(</mo><msup><mi>s</mi><mo>&#x2032;</mo></msup><mo>)</mo>
+          <mo>&#x2212;</mo>
+          <mi>&#x03A6;</mi><mo>(</mo><mi>s</mi><mo>)</mo>
+        </math>
+      </div>
+      <ul class="points">
+        <li><strong>Potential-based shaping</strong> (Ng et al.) &mdash; add &#x03B3;&#x03A6;(s') &minus; &#x03A6;(s) for any potential function &#x03A6;. Provably preserves the optimal policy.</li>
+        <li>Intuition: the shaping term telescopes and disappears from the return of any complete trajectory.</li>
+        <li>Use potentials that reflect an estimate of value or progress; done poorly, non-potential shaping introduces exactly the reward-hacking failure it was supposed to fix.</li>
+      </ul>`,
+    src: "Ng, Harada & Russell — Policy Invariance Under Reward Transformations",
+    url: "https://ai.stanford.edu/~ang/papers/shaping-icml99.pdf"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is Hindsight Experience Replay (HER)?",
+    body: `
+      <p class="answer">In goal-conditioned tasks with sparse rewards (robot picks up a specific object), failed episodes provide no learning signal. HER relabels them.</p>
+      <ul class="points">
+        <li>After an episode ending in failure state s<sub>final</sub>, replay it as if <em>s<sub>final</sub> was the goal all along</em> &mdash; suddenly the trajectory is a success.</li>
+        <li>Store both the original (failed) transitions and the relabeled (successful) ones in the replay buffer.</li>
+        <li>Works with any off-policy value/actor-critic method (DDPG, SAC).</li>
+        <li>Dramatically speeds up sparse-reward robot learning &mdash; every failed reach still teaches "how to reach where I ended up".</li>
+      </ul>`,
+    src: "Andrychowicz et al. — Hindsight Experience Replay",
+    url: "https://arxiv.org/abs/1707.01495"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "Behavioral cloning vs inverse RL &mdash; what's the difference?",
+    body: `
+      <ul class="points">
+        <li><strong>Behavioral cloning (BC)</strong> &mdash; supervised learning: fit a policy that maps observed expert states to expert actions. Simple; suffers from <strong>covariate shift</strong> (the policy visits states the expert never showed).</li>
+        <li><strong>Inverse RL (IRL)</strong> &mdash; recover the <em>reward function</em> that makes the expert's behavior optimal, then run RL on that reward. Handles new states because you learn the underlying objective, not just the action mapping.</li>
+        <li>IRL is expensive and often ill-posed (many rewards explain the same behavior); modern GAIL uses adversarial training to sidestep explicit reward recovery.</li>
+        <li>BC is the default in production (LLM SFT, autonomous driving) with tricks like DAgger to handle covariate shift.</li>
+      </ul>`,
+    src: "Ross, Gordon & Bagnell — A Reduction of Imitation Learning and Structured Prediction to No-Regret Online Learning (DAgger)",
+    url: "https://arxiv.org/abs/1011.0686"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is intrinsic motivation / curiosity, and why do we need it?",
+    body: `
+      <p class="answer">On sparse-reward tasks (Montezuma's Revenge, robotic exploration), extrinsic reward is too rare to bootstrap learning. Intrinsic reward gives the agent a self-generated bonus for exploration.</p>
+      <ul class="points">
+        <li><strong>Prediction error / ICM</strong> &mdash; train a forward model of the environment; reward transitions where the model was surprised.</li>
+        <li><strong>Random Network Distillation (RND)</strong> &mdash; train a network to predict a random fixed target's output; error on novel states is high, cheap to compute.</li>
+        <li><strong>Count-based / pseudo-counts</strong> &mdash; bonus proportional to 1/&#x221A;N(s) using density models on states.</li>
+        <li>Trade-off: too much curiosity distracts from the real task ("noisy TV" problem, where random noise permanently intrigues the agent).</li>
+      </ul>`,
+    src: "Pathak et al. — Curiosity-Driven Exploration by Self-Supervised Prediction",
+    url: "https://arxiv.org/abs/1705.05363"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is offline (batch) RL, and why is it harder than online RL?",
+    body: `
+      <p class="answer">Learn a policy purely from a fixed dataset of logged transitions, with no ability to interact with the environment. Critical for domains where interaction is expensive or unsafe (healthcare, autonomous driving, recommendation).</p>
+      <ul class="points">
+        <li>Core problem: <strong>distributional shift</strong>. The learned policy tries actions the dataset doesn't cover, and the Q function overestimates their values with no way to correct.</li>
+        <li>Naive off-policy methods (DQN, SAC) diverge in the offline setting; you get a policy that scores itself brilliantly and fails in the real world.</li>
+        <li>Standard fixes: <strong>CQL</strong> (Conservative Q-Learning) &mdash; penalize Q on out-of-distribution actions; <strong>BCQ</strong>, <strong>TD3+BC</strong> &mdash; constrain the policy to stay close to behavior; <strong>IQL</strong> &mdash; avoid the max over actions entirely.</li>
+        <li>Related to imitation learning but strictly more powerful &mdash; the dataset can contain suboptimal or mixed-quality behavior and offline RL can still improve on it.</li>
+      </ul>`,
+    src: "Levine, Kumar, Tucker & Fu — Offline Reinforcement Learning: Tutorial, Review, and Perspectives",
+    url: "https://arxiv.org/abs/2005.01643"
+  },
+  {
+    cat: "Reinforcement Learning",
+    q: "What is distributional RL (C51, QR-DQN), and why is it better than learning the mean?",
+    body: `
+      <p class="answer">Instead of learning E[Return | s, a], learn the entire distribution Z(s, a) over possible returns.</p>
+      <ul class="points">
+        <li><strong>C51</strong> represents Z on a fixed grid of 51 atoms; updates via a distributional Bellman operator projected back onto the grid.</li>
+        <li><strong>QR-DQN</strong> represents Z by learning N quantiles &mdash; more flexible than a fixed grid.</li>
+        <li><strong>IQN</strong> conditions on a random quantile fraction and learns the full inverse CDF.</li>
+      </ul>
+      <p class="answer">Why it works empirically better than plain DQN even though only the mean matters for greedy action selection: the distributional loss provides a richer learning signal, acts as a regularizer, and makes the target more stable. It's a component of Rainbow and modern SOTA agents.</p>`,
+    src: "Bellemare, Dabney & Munos — A Distributional Perspective on Reinforcement Learning (C51)",
+    url: "https://arxiv.org/abs/1707.06887"
   }
 ];
 
