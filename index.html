@@ -372,6 +372,60 @@
   .source span.arrow { transition: transform .15s; }
   .source:hover span.arrow { transform: translate(2px,-2px); }
 
+  .assessment {
+    margin: 16px 0 0;
+    padding: 14px 0 0;
+    border: 0;
+    border-top: 1px dashed #c7c0ac;
+  }
+  .assessment legend {
+    padding: 0;
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+  .assessment-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+    margin-top: 9px;
+  }
+  .assessment-option {
+    min-width: 0;
+    padding: 8px 5px;
+    border: 1px solid #bdb5a1;
+    border-radius: 7px;
+    color: var(--ink-soft);
+    background: transparent;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.25;
+    cursor: pointer;
+    transition: color .15s, background .15s, border-color .15s;
+  }
+  .assessment-option:hover { border-color: var(--teal-deep); color: var(--ink); }
+  .assessment-option:focus-visible { outline: 2px solid var(--teal-deep); outline-offset: 2px; }
+  .assessment-option[aria-pressed="true"] {
+    color: #fff;
+    background: var(--teal-deep);
+    border-color: var(--teal-deep);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   footer {
     margin-top: 48px;
     padding-top: 22px;
@@ -384,6 +438,7 @@
   @media (prefers-reduced-motion: reduce) {
     .start { transition: none; }
     .inner { transition: none; }
+    .assessment-option { transition: none; }
     .reveal .dot { animation: none; }
   }
 </style>
@@ -3965,6 +4020,47 @@ const chips   = document.getElementById("chips");
 const countEl = document.getElementById("count");
 document.getElementById("total").textContent = CARDS.length;
 
+const PROGRESS_KEY = "aiml-interview-deck-progress";
+
+function loadProgress() {
+  const empty = { schemaVersion: 1, userId: null, responses: {} };
+  try {
+    const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY));
+    if (saved && saved.schemaVersion === 1 && saved.responses && typeof saved.responses === "object") {
+      return { ...empty, ...saved, responses: saved.responses };
+    }
+  } catch (error) {
+    console.warn("Saved progress could not be loaded:", error);
+  }
+  return empty;
+}
+
+const progress = loadProgress();
+
+function cardId(c) {
+  const value = `${c.cat}\u0000${c.q}`;
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `card_${(hash >>> 0).toString(36)}`;
+}
+
+function saveAssessment(id, rating) {
+  progress.responses[id] = {
+    rating,
+    updatedAt: new Date().toISOString()
+  };
+  try {
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    return true;
+  } catch (error) {
+    console.warn("Progress could not be saved:", error);
+    return false;
+  }
+}
+
 let active = "All";
 
 function buildChips() {
@@ -3991,6 +4087,8 @@ function render() {
 
 function makeCard(c) {
   const card = document.createElement("div");
+  const id = cardId(c);
+  const selectedRating = progress.responses[id]?.rating || "";
   card.className = "card";
   card.setAttribute("role", "button");
   card.setAttribute("tabindex", "0");
@@ -3999,12 +4097,12 @@ function makeCard(c) {
   const cls = catClass[c.cat] || "";
   card.innerHTML = `
     <div class="inner">
-      <div class="face front">
+      <div class="face front" aria-hidden="false">
         <span class="tag ${cls}">${c.cat}</span>
         <p class="q">${c.q}</p>
         <span class="reveal"><span class="dot"></span> Tap to reveal answer</span>
       </div>
-      <div class="face back">
+      <div class="face back" aria-hidden="true" inert>
         <div class="back-head">
           <span class="lbl">Answer · ${c.cat}</span>
           <button class="flip-back" type="button" aria-label="Flip back to question">&#8634; Question</button>
@@ -4014,20 +4112,47 @@ function makeCard(c) {
           <a class="source" href="${c.url}" target="_blank" rel="noopener">
             &#128279; ${c.src} <span class="arrow">&#8599;</span>
           </a>
+          <fieldset class="assessment">
+            <legend>How well did you know this?</legend>
+            <div class="assessment-options">
+              <button class="assessment-option" type="button" data-rating="didnt_know" aria-pressed="${selectedRating === "didnt_know"}">Didn't Know</button>
+              <button class="assessment-option" type="button" data-rating="almost" aria-pressed="${selectedRating === "almost"}">Almost</button>
+              <button class="assessment-option" type="button" data-rating="knew_it" aria-pressed="${selectedRating === "knew_it"}">Knew It</button>
+            </div>
+            <span class="assessment-status sr-only" aria-live="polite"></span>
+          </fieldset>
         </div>
       </div>
     </div>`;
 
+  const front = card.querySelector(".front");
+  const back = card.querySelector(".back");
   const flip = (state) => {
     card.classList.toggle("flipped", state);
     card.setAttribute("aria-pressed", state);
+    front.setAttribute("aria-hidden", !state);
+    back.setAttribute("aria-hidden", state ? "false" : "true");
+    front.inert = state;
+    back.inert = !state;
   };
 
-  card.querySelector(".front").addEventListener("click", () => flip(true));
+  front.addEventListener("click", () => flip(true));
   card.querySelector(".flip-back").addEventListener("click", (e) => { e.stopPropagation(); flip(false); });
   card.querySelector(".back-scroll").addEventListener("click", (e) => e.stopPropagation());
+  card.querySelectorAll(".assessment-option").forEach(option => {
+    option.addEventListener("click", () => {
+      const rating = option.dataset.rating;
+      card.querySelectorAll(".assessment-option").forEach(button => {
+        button.setAttribute("aria-pressed", button === option);
+      });
+      const saved = saveAssessment(id, rating);
+      card.querySelector(".assessment-status").textContent = saved
+        ? `${option.textContent} saved.`
+        : "Your response could not be saved in this browser.";
+    });
+  });
   card.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
+    if (e.target === card && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
       flip(!card.classList.contains("flipped"));
     }
