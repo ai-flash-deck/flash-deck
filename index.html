@@ -536,10 +536,12 @@
   .source:hover span.arrow { transform: translate(2px,-2px); }
 
   .assessment {
-    margin: 16px 0 0;
-    padding: 14px 0 0;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 9px 14px 12px;
     border: 0;
-    border-top: 1px dashed #c7c0ac;
+    border-top: 1px solid var(--paper-2);
+    background: var(--paper);
   }
   .assessment legend {
     padding: 0;
@@ -4578,6 +4580,7 @@ function makeCard(c, options = {}) {
           <a class="source" href="${c.url}" target="_blank" rel="noopener">
             &#128279; ${c.src} <span class="arrow">&#8599;</span>
           </a>
+        </div>
           <fieldset class="assessment">
             <legend>How well did you know this?</legend>
             <div class="assessment-options">
@@ -4587,7 +4590,6 @@ function makeCard(c, options = {}) {
             </div>
             <span class="assessment-status sr-only" aria-live="polite"></span>
           </fieldset>
-        </div>
       </div>
     </div>`;
 
