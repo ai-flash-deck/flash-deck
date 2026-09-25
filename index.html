@@ -89,6 +89,30 @@
     margin: 0;
   }
 
+  .start {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 22px;
+    padding: 11px 18px;
+    border: 1px solid var(--amber);
+    border-radius: 9px;
+    color: var(--ground);
+    background: var(--amber);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    transition: transform .18s, background .18s, border-color .18s;
+  }
+  .start:hover {
+    transform: translateY(-1px);
+    background: #ffb64d;
+    border-color: #ffb64d;
+  }
+  .start:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+
   /* ---------- Toolbar ---------- */
   .toolbar {
     display: flex;
@@ -98,6 +122,17 @@
     margin: 30px 0 26px;
     padding-top: 22px;
     border-top: 1px solid var(--panel-line);
+  }
+
+  .topic-label {
+    flex-basis: 100%;
+    margin: 0 0 2px;
+    color: var(--light);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -136,6 +171,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
     gap: 20px;
+    scroll-margin-top: 20px;
   }
 
   /* ---------- Card ---------- */
@@ -346,6 +382,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .start { transition: none; }
     .inner { transition: none; }
     .reveal .dot { animation: none; }
   }
@@ -357,12 +394,14 @@
 <div class="wrap">
   <header>
     <p class="eyebrow"><span class="sig">●</span> Machine Learning · Technical Interview Prep</p>
-    <h1>The AI/ML Interview <em>Deck</em></h1>
-    <p class="lede">A curated study deck of the essential concepts that come up in highly technical AI/ML interviews — spanning ML foundations, probability, deep learning, Transformers &amp; LLMs, and reinforcement learning. Tap any card to flip it: the answer side holds a tight explanation, the key equation or diagram, and a link to the canonical source.</p>
+    <h1>Prepare for your next <em>AI/ML technical interview.</em></h1>
+    <p class="lede">Practice curated questions across machine learning, probability, deep learning, Transformers, LLMs, and reinforcement learning.</p>
+    <a class="start" href="#grid">Start Practicing <span aria-hidden="true">↓</span></a>
   </header>
 
-  <div class="toolbar">
-    <div class="chips" id="chips"></div>
+  <div class="toolbar" aria-labelledby="topic-label">
+    <p class="topic-label" id="topic-label">Choose a topic</p>
+    <div class="chips" id="chips" aria-label="Interview topics"></div>
     <div class="count" id="count"></div>
   </div>
 
