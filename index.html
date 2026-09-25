@@ -134,13 +134,14 @@
   /* ---------- Grid ---------- */
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
     gap: 20px;
   }
 
   /* ---------- Card ---------- */
   .card {
     position: relative;
+    min-width: 0;
     height: 372px;
     perspective: 1600px;
     cursor: pointer;
@@ -251,6 +252,8 @@
 
   .back-head {
     display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
@@ -341,13 +344,6 @@
     font-size: 13px;
     line-height: 1.6;
   }
-  footer code {
-    font-family: var(--font-mono);
-    color: var(--teal);
-    background: var(--ground-2);
-    padding: 1px 6px;
-    border-radius: 5px;
-  }
 
   @media (prefers-reduced-motion: reduce) {
     .inner { transition: none; }
@@ -373,7 +369,7 @@
   <div class="grid" id="grid"></div>
 
   <footer>
-    Prototype study deck · <span id="total"></span> cards. Built as a single self-contained page — equations render with native <code>MathML</code>, no external libraries. Extend the deck by adding entries to the <code>CARDS</code> array in the source.
+    <span id="total"></span> flashcards for your AI/ML interview preparation.
   </footer>
 </div>
 
