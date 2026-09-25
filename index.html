@@ -166,6 +166,169 @@
   }
   .count b { color: var(--amber); }
 
+  /* ---------- Study sessions ---------- */
+  .session-panel {
+    margin: 30px 0 26px;
+    padding: 18px;
+    border: 1px solid var(--panel-line);
+    border-radius: var(--r);
+    background: rgba(15, 26, 44, 0.72);
+  }
+  .session-panel h2,
+  .session-summary h2 {
+    margin: 0 0 6px;
+    color: var(--light);
+    font-size: 1.1rem;
+  }
+  .session-copy {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+  .session-setup-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .topic-select-label {
+    display: grid;
+    gap: 6px;
+    min-width: min(240px, 100%);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .topic-select {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 34px 8px 11px;
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    color: var(--light);
+    background: var(--ground-2);
+    font: 13px var(--font-sans);
+  }
+  .session-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .session-button {
+    min-height: 40px;
+    padding: 9px 14px;
+    border: 1px solid var(--teal-deep);
+    border-radius: 8px;
+    color: var(--light);
+    background: transparent;
+    font: 600 12px var(--font-mono);
+    cursor: pointer;
+    transition: color .15s, background .15s, border-color .15s;
+  }
+  .session-button:hover { border-color: var(--teal); }
+  .session-button.primary {
+    color: var(--ground);
+    background: var(--teal);
+    border-color: var(--teal);
+  }
+  .session-button.secondary { color: var(--teal); }
+  .session-button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+  .session-button:disabled { opacity: .45; cursor: not-allowed; }
+  .resume-prompt {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .session-view {
+    max-width: 620px;
+    margin: 30px auto 0;
+  }
+  .session-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 9px;
+    color: var(--muted);
+    font: 12px var(--font-mono);
+  }
+  .session-topline-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .session-pause {
+    padding: 0;
+    border: 0;
+    color: var(--teal);
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+  }
+  .session-pause:hover { text-decoration: underline; }
+  .session-pause:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+  .session-progress-track {
+    height: 4px;
+    margin-bottom: 18px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--panel-line);
+  }
+  .session-progress-bar {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--teal);
+    transition: width .2s ease;
+  }
+  .session-card-host .card { width: 100%; }
+  .session-nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .session-hint {
+    align-self: center;
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .session-summary {
+    max-width: 620px;
+    margin: 30px auto 0;
+    padding: 24px;
+    border: 1px solid var(--panel-line);
+    border-radius: var(--r);
+    background: var(--ground-2);
+  }
+  .summary-total { margin: 0 0 18px; color: var(--muted); }
+  .summary-results {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 0 0 18px;
+  }
+  .summary-result {
+    padding: 12px 8px;
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    text-align: center;
+  }
+  .summary-result b { display: block; color: var(--light); font-size: 1.35rem; }
+  .summary-result span { color: var(--muted); font-size: 11px; }
+  .summary-confidence { margin: 0 0 20px; color: var(--light); }
+
+  [hidden] { display: none !important; }
+
   /* ---------- Grid ---------- */
   .grid {
     display: grid;
@@ -439,7 +602,17 @@
     .start { transition: none; }
     .inner { transition: none; }
     .assessment-option { transition: none; }
+    .session-button, .session-progress-bar { transition: none; }
     .reveal .dot { animation: none; }
+  }
+
+  @media (max-width: 520px) {
+    .session-panel { padding: 15px; }
+    .session-setup-row, .topic-select-label, .session-actions { width: 100%; }
+    .session-actions .session-button { flex: 1; }
+    .summary-results { grid-template-columns: 1fr; }
+    .summary-result { display: flex; align-items: center; justify-content: space-between; text-align: left; }
+    .summary-result b { display: inline; }
   }
 </style>
 </head>
@@ -454,6 +627,64 @@
     <a class="start" href="#grid">Start Practicing <span aria-hidden="true">↓</span></a>
   </header>
 
+  <section class="session-panel" id="session-panel" aria-labelledby="session-heading">
+    <div id="resume-prompt" class="resume-prompt" hidden>
+      <div>
+        <h2 id="resume-heading">Continue your study session</h2>
+        <p class="session-copy" id="resume-copy"></p>
+      </div>
+      <div class="session-actions">
+        <button class="session-button primary" id="resume-session" type="button">Resume Session</button>
+        <button class="session-button secondary" id="new-session" type="button">Start New Session</button>
+      </div>
+    </div>
+    <div id="session-setup">
+      <h2 id="session-heading">Start a study session</h2>
+      <p class="session-copy">Choose a topic, then practice a focused set of questions.</p>
+      <div class="session-setup-row">
+        <label class="topic-select-label" for="session-topic">
+          Topic
+          <select class="topic-select" id="session-topic"></select>
+        </label>
+        <div class="session-actions">
+          <button class="session-button primary" type="button" data-session-type="quick">Quick Practice · 15</button>
+          <button class="session-button" type="button" data-session-type="full">Full Practice · 30</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="session-view" id="session-view" aria-labelledby="session-progress" hidden>
+    <div class="session-topline">
+      <strong id="session-progress"></strong>
+      <div class="session-topline-meta">
+        <span id="session-topic-label"></span>
+        <button class="session-pause" id="pause-session" type="button">Pause</button>
+      </div>
+    </div>
+    <div class="session-progress-track" aria-hidden="true">
+      <div class="session-progress-bar" id="session-progress-bar"></div>
+    </div>
+    <div class="session-card-host" id="session-card-host"></div>
+    <div class="session-nav">
+      <p class="session-hint" id="session-hint">Reveal the answer, then assess yourself.</p>
+      <button class="session-button primary" id="next-question" type="button" disabled>Next</button>
+    </div>
+  </section>
+
+  <section class="session-summary" id="session-summary" aria-labelledby="summary-heading" hidden>
+    <h2 id="summary-heading">Session Complete</h2>
+    <p class="summary-total" id="summary-total"></p>
+    <div class="summary-results" id="summary-results"></div>
+    <p class="summary-confidence" id="summary-confidence"></p>
+    <div class="session-actions">
+      <button class="session-button primary" id="practice-again" type="button">Practice Again</button>
+      <button class="session-button" id="practice-weak" type="button">Practice Weak Areas</button>
+      <button class="session-button secondary" id="return-to-deck" type="button">Return to Deck</button>
+    </div>
+  </section>
+
+  <div id="browse-view">
   <div class="toolbar" aria-labelledby="topic-label">
     <p class="topic-label" id="topic-label">Choose a topic</p>
     <div class="chips" id="chips" aria-label="Interview topics"></div>
@@ -465,6 +696,7 @@
   <footer>
     <span id="total"></span> flashcards for your AI/ML interview preparation.
   </footer>
+  </div>
 </div>
 
 <script>
@@ -4061,10 +4293,242 @@ function saveAssessment(id, rating) {
   }
 }
 
+const SESSION_KEY = "aiml-interview-deck-session";
+const RATING_VALUES = new Set(["didnt_know", "almost", "knew_it"]);
+const cardsById = new Map(CARDS.map(card => [cardId(card), card]));
+
+const sessionPanel = document.getElementById("session-panel");
+const sessionSetup = document.getElementById("session-setup");
+const resumePrompt = document.getElementById("resume-prompt");
+const resumeCopy = document.getElementById("resume-copy");
+const sessionTopic = document.getElementById("session-topic");
+const sessionView = document.getElementById("session-view");
+const sessionProgress = document.getElementById("session-progress");
+const sessionTopicLabel = document.getElementById("session-topic-label");
+const sessionProgressBar = document.getElementById("session-progress-bar");
+const sessionCardHost = document.getElementById("session-card-host");
+const sessionHint = document.getElementById("session-hint");
+const nextQuestion = document.getElementById("next-question");
+const sessionSummary = document.getElementById("session-summary");
+const browseView = document.getElementById("browse-view");
+
+function availableCategories() {
+  return CAT_ORDER.filter(category => CARDS.some(card => card.cat === category));
+}
+
+function loadSession() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SESSION_KEY));
+    if (!saved || saved.schemaVersion !== 1 || !Array.isArray(saved.cardIds)) return null;
+
+    const cardIds = [...new Set(saved.cardIds)].filter(id => cardsById.has(id));
+    if (!cardIds.length) return null;
+
+    const responses = {};
+    if (saved.responses && typeof saved.responses === "object") {
+      cardIds.forEach(id => {
+        const response = saved.responses[id];
+        if (response && RATING_VALUES.has(response.rating)) responses[id] = response;
+      });
+    }
+
+    return {
+      ...saved,
+      cardIds,
+      responses,
+      position: Math.min(Math.max(Number(saved.position) || 0, 0), cardIds.length - 1),
+      status: saved.status === "completed" ? "completed" : "active"
+    };
+  } catch (error) {
+    console.warn("Saved session could not be loaded:", error);
+    return null;
+  }
+}
+
+let session = loadSession();
 let active = "All";
+let advancing = false;
+
+function saveSession() {
+  if (!session) return false;
+  session.updatedAt = new Date().toISOString();
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    return true;
+  } catch (error) {
+    console.warn("Study session could not be saved:", error);
+    return false;
+  }
+}
+
+function shuffle(items) {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+function selectSessionCards(poolIds, requestedLength, previousIds = []) {
+  const uniquePool = [...new Set(poolIds)].filter(id => cardsById.has(id));
+  const count = Math.min(requestedLength, uniquePool.length);
+  const previous = new Set(previousIds);
+  const fresh = shuffle(uniquePool.filter(id => !previous.has(id)));
+  const repeated = shuffle(uniquePool.filter(id => previous.has(id)));
+  const selected = [...fresh, ...repeated].slice(0, count);
+
+  if (selected.length > 1 && selected.every((id, index) => id === previousIds[index])) {
+    selected.push(selected.shift());
+  }
+  return selected;
+}
+
+function beginSession({ sessionType, requestedLength, topic, poolIds, previousIds = [], preserveOrder = false }) {
+  const eligibleIds = poolIds || CARDS
+    .filter(card => topic === "All" || card.cat === topic)
+    .map(cardId);
+  const cardIds = preserveOrder
+    ? [...new Set(eligibleIds)].filter(id => cardsById.has(id)).slice(0, requestedLength)
+    : selectSessionCards(eligibleIds, requestedLength, previousIds);
+  if (!cardIds.length) return;
+
+  const now = new Date().toISOString();
+  session = {
+    schemaVersion: 1,
+    userId: null,
+    sessionId: `session_${Date.now().toString(36)}`,
+    sessionType,
+    requestedLength,
+    topic,
+    cardIds,
+    position: 0,
+    responses: {},
+    status: "active",
+    startedAt: now,
+    updatedAt: now
+  };
+  saveSession();
+  showSession();
+}
+
+function refreshSessionLauncher() {
+  const resumable = session?.status === "active";
+  resumePrompt.hidden = !resumable;
+  sessionSetup.hidden = resumable;
+  if (resumable) {
+    const label = session.sessionType === "quick" ? "Quick Practice" :
+      session.sessionType === "full" ? "Full Practice" : "Weak Areas";
+    resumeCopy.textContent = `${label} · Question ${session.position + 1} of ${session.cardIds.length}`;
+  }
+}
+
+function showDeck() {
+  sessionView.hidden = true;
+  sessionSummary.hidden = true;
+  sessionPanel.hidden = false;
+  browseView.hidden = false;
+  refreshSessionLauncher();
+}
+
+function recordSessionAssessment(id, rating) {
+  if (!session || session.status !== "active" || session.cardIds[session.position] !== id) return;
+  session.responses[id] = { rating, updatedAt: new Date().toISOString() };
+  saveSession();
+  nextQuestion.disabled = false;
+  sessionHint.textContent = "Assessment saved. You can change it or continue.";
+}
+
+function showSession() {
+  if (!session || session.status !== "active") return showDeck();
+  const id = session.cardIds[session.position];
+  const card = cardsById.get(id);
+  if (!card) return showDeck();
+
+  sessionPanel.hidden = true;
+  browseView.hidden = true;
+  sessionSummary.hidden = true;
+  sessionView.hidden = false;
+  sessionProgress.textContent = `Question ${session.position + 1} of ${session.cardIds.length}`;
+  sessionTopicLabel.textContent = session.topic;
+  sessionProgressBar.style.width = `${((session.position + 1) / session.cardIds.length) * 100}%`;
+  sessionCardHost.innerHTML = "";
+  sessionCardHost.appendChild(makeCard(card, {
+    selectedRating: session.responses[id]?.rating || "",
+    onAssess: recordSessionAssessment
+  }));
+
+  const assessed = Boolean(session.responses[id]);
+  nextQuestion.disabled = !assessed;
+  nextQuestion.textContent = session.position === session.cardIds.length - 1 ? "View Results" : "Next";
+  sessionHint.textContent = assessed
+    ? "Assessment saved. You can change it or continue."
+    : "Reveal the answer, then assess yourself.";
+  advancing = false;
+  window.scrollTo({ top: sessionView.offsetTop - 20, behavior: "smooth" });
+}
+
+function completeSession() {
+  session.status = "completed";
+  session.completedAt = new Date().toISOString();
+  saveSession();
+  showSummary();
+}
+
+function sessionCounts() {
+  const counts = { knew_it: 0, almost: 0, didnt_know: 0 };
+  session.cardIds.forEach(id => {
+    const rating = session.responses[id]?.rating;
+    if (RATING_VALUES.has(rating)) counts[rating]++;
+  });
+  return counts;
+}
+
+function showSummary() {
+  if (!session || session.status !== "completed") return showDeck();
+  const counts = sessionCounts();
+  const total = session.cardIds.length;
+  const confident = Math.round((counts.knew_it / total) * 100);
+  sessionPanel.hidden = true;
+  browseView.hidden = true;
+  sessionView.hidden = true;
+  sessionSummary.hidden = false;
+  document.getElementById("summary-total").textContent = `${total} Questions Completed`;
+  document.getElementById("summary-results").innerHTML = `
+    <div class="summary-result"><b>${counts.knew_it}</b><span>Knew It</span></div>
+    <div class="summary-result"><b>${counts.almost}</b><span>Almost</span></div>
+    <div class="summary-result"><b>${counts.didnt_know}</b><span>Didn't Know</span></div>`;
+  document.getElementById("summary-confidence").textContent = `${confident}% confidently answered`;
+  document.getElementById("practice-weak").hidden = counts.almost + counts.didnt_know === 0;
+  window.scrollTo({ top: sessionSummary.offsetTop - 20, behavior: "smooth" });
+}
+
+function startWeakSession() {
+  const didntKnow = shuffle(session.cardIds.filter(id => session.responses[id]?.rating === "didnt_know"));
+  const almost = shuffle(session.cardIds.filter(id => session.responses[id]?.rating === "almost"));
+  const weakIds = [...didntKnow, ...almost];
+  if (!weakIds.length) return;
+  beginSession({
+    sessionType: "weak",
+    requestedLength: weakIds.length,
+    topic: "Weak Areas",
+    poolIds: weakIds,
+    preserveOrder: true
+  });
+}
+
+function populateSessionTopics() {
+  sessionTopic.innerHTML = "";
+  ["All", ...availableCategories()].forEach(category => {
+    const option = document.createElement("option");
+    option.value = category;
+    option.textContent = category === "All" ? "All Topics" : category;
+    sessionTopic.appendChild(option);
+  });
+}
 
 function buildChips() {
-  const present = CAT_ORDER.filter(c => CARDS.some(card => card.cat === c));
+  const present = availableCategories();
   const cats = ["All", ...present];
   chips.innerHTML = "";
   cats.forEach(cat => {
@@ -4085,10 +4549,12 @@ function render() {
   countEl.innerHTML = `Showing <b>${list.length}</b> / ${CARDS.length} cards`;
 }
 
-function makeCard(c) {
+function makeCard(c, options = {}) {
   const card = document.createElement("div");
   const id = cardId(c);
-  const selectedRating = progress.responses[id]?.rating || "";
+  const selectedRating = Object.prototype.hasOwnProperty.call(options, "selectedRating")
+    ? options.selectedRating
+    : progress.responses[id]?.rating || "";
   card.className = "card";
   card.setAttribute("role", "button");
   card.setAttribute("tabindex", "0");
@@ -4146,6 +4612,7 @@ function makeCard(c) {
         button.setAttribute("aria-pressed", button === option);
       });
       const saved = saveAssessment(id, rating);
+      if (typeof options.onAssess === "function") options.onAssess(id, rating);
       card.querySelector(".assessment-status").textContent = saved
         ? `${option.textContent} saved.`
         : "Your response could not be saved in this browser.";
@@ -4161,7 +4628,62 @@ function makeCard(c) {
   return card;
 }
 
+document.querySelectorAll("[data-session-type]").forEach(button => {
+  button.addEventListener("click", () => {
+    const type = button.dataset.sessionType;
+    beginSession({
+      sessionType: type,
+      requestedLength: type === "quick" ? 15 : 30,
+      topic: sessionTopic.value
+    });
+  });
+});
+
+document.getElementById("resume-session").addEventListener("click", showSession);
+document.getElementById("new-session").addEventListener("click", () => {
+  session = null;
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch (error) {
+    console.warn("Saved session could not be cleared:", error);
+  }
+  resumePrompt.hidden = true;
+  sessionSetup.hidden = false;
+});
+document.getElementById("pause-session").addEventListener("click", showDeck);
+
+nextQuestion.addEventListener("click", () => {
+  if (advancing || nextQuestion.disabled || !session) return;
+  advancing = true;
+  nextQuestion.disabled = true;
+  if (session.position >= session.cardIds.length - 1) {
+    completeSession();
+    return;
+  }
+  session.position++;
+  saveSession();
+  showSession();
+});
+
+document.getElementById("practice-again").addEventListener("click", () => {
+  const previousIds = [...session.cardIds];
+  const poolIds = session.sessionType === "weak" ? previousIds : null;
+  beginSession({
+    sessionType: session.sessionType,
+    requestedLength: session.requestedLength,
+    topic: session.topic,
+    poolIds,
+    previousIds
+  });
+});
+
+document.getElementById("practice-weak").addEventListener("click", startWeakSession);
+document.getElementById("return-to-deck").addEventListener("click", showDeck);
+
+populateSessionTopics();
 render();
+if (session?.status === "completed") showSummary();
+else showDeck();
 </script>
 
 <script>
