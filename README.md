@@ -4,10 +4,14 @@ A self-contained Progressive Web App (PWA) of flip-card flashcards for highly te
 AI/ML interviews — ML foundations, probability, deep learning, Transformers & LLMs, and RL.
 Equations render with native MathML; no build step, no dependencies.
 
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the current state model, persistence
+boundaries, known risks, and the recommended next iteration.
+
 ## Files
 
 ```
 index.html          The full app (deck + styles + logic)
+ARCHITECTURE.md      Current architecture, boundaries, and migration plan
 manifest.json       PWA metadata (name, icons, colors)
 sw.js               Service worker — caches the app for offline use
 icons/
@@ -57,6 +61,7 @@ All flashcards live in the `CARDS` array inside `index.html`. Each entry is:
 
 ```js
 {
+  id:  "q_0001",              // immutable question identity
   cat: "Transformers & LLMs",   // category (drives the filter chip + color)
   q:   "Question text",
   body: `<p class="answer">...</p> <div class="eq"><math>...</math></div>`,
@@ -65,7 +70,8 @@ All flashcards live in the `CARDS` array inside `index.html`. Each entry is:
 }
 ```
 
-**Important:** after changing `index.html` or any asset, bump `CACHE_VERSION` in `sw.js`
+Keep an existing card's `id` unchanged when editing its question, answer, or
+category. After changing `index.html` or any asset, bump `CACHE_VERSION` in `sw.js`
 (e.g. `aiml-deck-v1` → `v2`) so installed clients fetch the new version instead of the cached one.
 
 ## Test locally

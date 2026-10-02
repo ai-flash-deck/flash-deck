@@ -702,6 +702,28 @@
 </div>
 
 <script>
+/**
+ * @typedef {"didnt_know" | "almost" | "knew_it"} Rating
+ * @typedef {{ rating: Rating, updatedAt: string }} AssessmentRecord
+ * @typedef {{ id: string, cat: string, q: string, body: string, src: string, url: string }} Question
+ * @typedef {{ schemaVersion: 2, userId: null | string, responses: Object<string, AssessmentRecord>, unmappedLegacyResponses?: Object<string, AssessmentRecord> }} ProgressState
+ * @typedef {{
+ *   schemaVersion: 2,
+ *   userId: null | string,
+ *   sessionId: string,
+ *   sessionType: "quick" | "full" | "weak",
+ *   requestedLength: number,
+ *   topic: string,
+ *   cardIds: string[],
+ *   position: number,
+ *   responses: Object<string, AssessmentRecord>,
+ *   status: "active" | "completed",
+ *   startedAt: string,
+ *   updatedAt: string,
+ *   completedAt?: string
+ * }} StudySession
+ */
+
 /* ------------------------------------------------------------------ *
  *  Flashcard data — each entry generates one flip card.
  *  cat ∈ { ML Foundations | Probability & Stats | Deep Learning |
@@ -712,6 +734,7 @@ const CARDS = [
 
   /* ===================== ML FOUNDATIONS ===================== */
   {
+    id: "q_0001",
     cat: "ML Foundations",
     q: "Derive the bias–variance decomposition. What does each term mean?",
     body: `
@@ -735,6 +758,7 @@ const CARDS = [
     url: "https://hastie.su.domains/ElemStatLearn/"
   },
   {
+    id: "q_0002",
     cat: "ML Foundations",
     q: "L1 vs L2 regularization — write both penalties and explain why L1 induces sparsity.",
     body: `
@@ -753,6 +777,7 @@ const CARDS = [
     url: "https://hastie.su.domains/ElemStatLearn/"
   },
   {
+    id: "q_0003",
     cat: "ML Foundations",
     q: "Why use cross-entropy rather than MSE to train a classifier?",
     body: `
@@ -774,6 +799,7 @@ const CARDS = [
     url: "https://www.deeplearningbook.org/"
   },
   {
+    id: "q_0004",
     cat: "ML Foundations",
     q: "Precision, recall, F1, ROC-AUC — define them and say when each matters.",
     body: `
@@ -796,6 +822,7 @@ const CARDS = [
     url: "https://scikit-learn.org/stable/modules/model_evaluation.html"
   },
   {
+    id: "q_0005",
     cat: "ML Foundations",
     q: "Supervised, unsupervised, semi-supervised, self-supervised — what are the differences?",
     body: `
@@ -809,6 +836,7 @@ const CARDS = [
     url: "https://hastie.su.domains/ElemStatLearn/"
   },
   {
+    id: "q_0006",
     cat: "ML Foundations",
     q: "How do you diagnose whether a model is overfitting or underfitting?",
     body: `
@@ -822,6 +850,7 @@ const CARDS = [
     url: "https://www.deeplearning.ai/machine-learning-yearning/"
   },
   {
+    id: "q_0007",
     cat: "ML Foundations",
     q: "Why train/val/test rather than just train/test? What's a common pitfall?",
     body: `
@@ -834,6 +863,7 @@ const CARDS = [
     url: "https://www.deeplearning.ai/machine-learning-yearning/"
   },
   {
+    id: "q_0008",
     cat: "ML Foundations",
     q: "What is k-fold cross-validation, and when is it worth the compute?",
     body: `
@@ -848,6 +878,7 @@ const CARDS = [
     url: "https://scikit-learn.org/stable/modules/cross_validation.html"
   },
   {
+    id: "q_0009",
     cat: "ML Foundations",
     q: "What is the curse of dimensionality, and how does it affect ML?",
     body: `
@@ -861,6 +892,7 @@ const CARDS = [
     url: "https://en.wikipedia.org/wiki/Curse_of_dimensionality"
   },
   {
+    id: "q_0010",
     cat: "ML Foundations",
     q: "Should you standardize, min-max scale, or leave features alone?",
     body: `
@@ -874,6 +906,7 @@ const CARDS = [
     url: "https://scikit-learn.org/stable/modules/preprocessing.html"
   },
   {
+    id: "q_0011",
     cat: "ML Foundations",
     q: "One-hot encoding vs learned embeddings for categorical features — when do you use each?",
     body: `
@@ -887,6 +920,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1604.06737"
   },
   {
+    id: "q_0012",
     cat: "ML Foundations",
     q: "What is target (mean) encoding, and what is the leakage risk?",
     body: `
@@ -900,6 +934,7 @@ const CARDS = [
     url: "https://dl.acm.org/doi/10.1145/507533.507538"
   },
   {
+    id: "q_0013",
     cat: "ML Foundations",
     q: "Write the logistic regression model. Why is it \"regression\" but used for classification?",
     body: `
@@ -923,6 +958,7 @@ const CARDS = [
     url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
   },
   {
+    id: "q_0014",
     cat: "ML Foundations",
     q: "What is the Naive Bayes assumption, and why does the classifier work well despite it being false?",
     body: `
@@ -936,6 +972,7 @@ const CARDS = [
     url: "https://link.springer.com/article/10.1023/A:1007413511361"
   },
   {
+    id: "q_0015",
     cat: "ML Foundations",
     q: "What is the max-margin objective of a linear SVM?",
     body: `
@@ -962,6 +999,7 @@ const CARDS = [
     url: "https://link.springer.com/article/10.1007/BF00994018"
   },
   {
+    id: "q_0016",
     cat: "ML Foundations",
     q: "What is the kernel trick, and what makes a function a valid kernel?",
     body: `
@@ -975,6 +1013,7 @@ const CARDS = [
     url: "https://mitpress.mit.edu/9780262536578/learning-with-kernels/"
   },
   {
+    id: "q_0017",
     cat: "ML Foundations",
     q: "In decision trees, Gini vs entropy for split criteria — does it matter?",
     body: `
@@ -1001,6 +1040,7 @@ const CARDS = [
     url: "https://hastie.su.domains/ElemStatLearn/"
   },
   {
+    id: "q_0018",
     cat: "ML Foundations",
     q: "Why do Random Forests work? What do bagging and feature subsampling each contribute?",
     body: `
@@ -1013,6 +1053,7 @@ const CARDS = [
     url: "https://link.springer.com/article/10.1023/A:1010933404324"
   },
   {
+    id: "q_0019",
     cat: "ML Foundations",
     q: "What do gradient boosted trees (XGBoost, LightGBM) optimize, and why are they so strong on tabular data?",
     body: `
@@ -1027,6 +1068,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1603.02754"
   },
   {
+    id: "q_0020",
     cat: "ML Foundations",
     q: "How does k-NN work, and what are its main practical limitations?",
     body: `
@@ -1041,6 +1083,7 @@ const CARDS = [
     url: "https://ieeexplore.ieee.org/document/1053964"
   },
   {
+    id: "q_0021",
     cat: "ML Foundations",
     q: "Describe k-means. What's the objective, and what are its main failure modes?",
     body: `
@@ -1063,6 +1106,7 @@ const CARDS = [
     url: "https://theory.stanford.edu/~sergei/papers/kMeansPP-soda.pdf"
   },
   {
+    id: "q_0022",
     cat: "ML Foundations",
     q: "How does the EM algorithm fit a Gaussian Mixture Model, and how is it different from k-means?",
     body: `
@@ -1076,6 +1120,7 @@ const CARDS = [
     url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
   },
   {
+    id: "q_0023",
     cat: "ML Foundations",
     q: "How does PCA work, and what assumption does it make?",
     body: `
@@ -1090,6 +1135,7 @@ const CARDS = [
     url: "https://royalsocietypublishing.org/doi/10.1098/rsta.2015.0202"
   },
   {
+    id: "q_0024",
     cat: "ML Foundations",
     q: "When would you use t-SNE, UMAP, or PCA for visualization? What are the gotchas?",
     body: `
@@ -1103,6 +1149,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1802.03426"
   },
   {
+    id: "q_0025",
     cat: "ML Foundations",
     q: "What does a confusion matrix tell you that accuracy doesn't?",
     body: `
@@ -1117,6 +1164,7 @@ const CARDS = [
     url: "https://scikit-learn.org/stable/modules/model_evaluation.html#confusion-matrix"
   },
   {
+    id: "q_0026",
     cat: "ML Foundations",
     q: "When should you use PR-AUC instead of ROC-AUC?",
     body: `
@@ -1130,6 +1178,7 @@ const CARDS = [
     url: "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0118432"
   },
   {
+    id: "q_0027",
     cat: "ML Foundations",
     q: "Compare regression metrics: RMSE, MAE, MAPE, R&sup2;.",
     body: `
@@ -1144,6 +1193,7 @@ const CARDS = [
     url: "https://otexts.com/fpp3/accuracy.html"
   },
   {
+    id: "q_0028",
     cat: "ML Foundations",
     q: "How does cross-validation change for time-series data?",
     body: `
@@ -1157,6 +1207,7 @@ const CARDS = [
     url: "https://scikit-learn.org/stable/modules/cross_validation.html#time-series-split"
   },
   {
+    id: "q_0029",
     cat: "ML Foundations",
     q: "Grid search vs random search vs Bayesian optimization for hyperparameter tuning.",
     body: `
@@ -1170,6 +1221,7 @@ const CARDS = [
     url: "https://jmlr.org/papers/v13/bergstra12a.html"
   },
   {
+    id: "q_0030",
     cat: "ML Foundations",
     q: "How do you read a learning curve to distinguish bias from variance?",
     body: `
@@ -1184,6 +1236,7 @@ const CARDS = [
     url: "https://www.deeplearning.ai/machine-learning-yearning/"
   },
   {
+    id: "q_0031",
     cat: "ML Foundations",
     q: "What does the No Free Lunch theorem actually say, and what should you take from it?",
     body: `
@@ -1197,6 +1250,7 @@ const CARDS = [
     url: "https://www.mitpressjournals.org/doi/abs/10.1162/neco.1996.8.7.1341"
   },
   {
+    id: "q_0032",
     cat: "ML Foundations",
     q: "What is VC dimension, and what does it tell you about generalization?",
     body: `
@@ -1211,6 +1265,7 @@ const CARDS = [
     url: "https://link.springer.com/book/10.1007/978-1-4757-3264-1"
   },
   {
+    id: "q_0033",
     cat: "ML Foundations",
     q: "Bagging vs boosting vs stacking — how do the three ensembling ideas differ?",
     body: `
@@ -1224,6 +1279,7 @@ const CARDS = [
     url: "https://hastie.su.domains/ElemStatLearn/"
   },
   {
+    id: "q_0034",
     cat: "ML Foundations",
     q: "How do you detect anomalies in unlabeled data?",
     body: `
@@ -1238,6 +1294,7 @@ const CARDS = [
     url: "https://ieeexplore.ieee.org/document/4781136"
   },
   {
+    id: "q_0035",
     cat: "ML Foundations",
     q: "What are the standard strategies for handling missing data?",
     body: `
@@ -1253,6 +1310,7 @@ const CARDS = [
     url: "https://stefvanbuuren.name/fimd/"
   },
   {
+    id: "q_0036",
     cat: "ML Foundations",
     q: "What is multicollinearity, and why does it matter for linear models but not for trees?",
     body: `
@@ -1267,6 +1325,7 @@ const CARDS = [
     url: "https://hastie.su.domains/ElemStatLearn/"
   },
   {
+    id: "q_0037",
     cat: "ML Foundations",
     q: "What is data leakage? Give three ways it sneaks in.",
     body: `
@@ -1282,6 +1341,7 @@ const CARDS = [
     url: "https://www.cs.umb.edu/~ding/history/470_670_fall_2011/papers/cs670_Tran_PreferredPaper_LeakingInDataMining.pdf"
   },
   {
+    id: "q_0038",
     cat: "ML Foundations",
     q: "How do you encode cyclical features like hour-of-day or day-of-week?",
     body: `
@@ -1305,6 +1365,7 @@ const CARDS = [
     url: "https://www.kaggle.com/learn/feature-engineering"
   },
   {
+    id: "q_0039",
     cat: "ML Foundations",
     q: "Batch prediction vs online (streaming) inference — when do you pick each?",
     body: `
@@ -1318,6 +1379,7 @@ const CARDS = [
     url: "https://huyenchip.com/ml-systems-book/"
   },
   {
+    id: "q_0040",
     cat: "ML Foundations",
     q: "What is concept drift, and how do you monitor for it in production?",
     body: `
@@ -1332,6 +1394,7 @@ const CARDS = [
     url: "https://dl.acm.org/doi/10.1145/2523813"
   },
   {
+    id: "q_0041",
     cat: "ML Foundations",
     q: "Compare feature-importance methods: gain, permutation, SHAP.",
     body: `
@@ -1345,6 +1408,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1705.07874"
   },
   {
+    id: "q_0042",
     cat: "ML Foundations",
     q: "Compare Platt scaling and isotonic regression for calibrating a classifier's probabilities.",
     body: `
@@ -1358,6 +1422,7 @@ const CARDS = [
     url: "https://www.cs.cornell.edu/~alexn/papers/calibration.icml05.crc.rev3.pdf"
   },
   {
+    id: "q_0043",
     cat: "ML Foundations",
     q: "You have severe class imbalance and can't collect more minority-class data. What do you do?",
     body: `
@@ -1372,6 +1437,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1901.05555"
   },
   {
+    id: "q_0044",
     cat: "ML Foundations",
     q: "Compare filter, wrapper, and embedded feature selection methods.",
     body: `
@@ -1387,6 +1453,7 @@ const CARDS = [
 
   /* ===================== PROBABILITY & STATS ===================== */
   {
+    id: "q_0045",
     cat: "Probability & Stats",
     q: "MLE vs MAP — write both objectives. When do they coincide?",
     body: `
@@ -1404,6 +1471,7 @@ const CARDS = [
     url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
   },
   {
+    id: "q_0046",
     cat: "Probability & Stats",
     q: "State Bayes' theorem and contrast generative vs discriminative models.",
     body: `
@@ -1425,6 +1493,7 @@ const CARDS = [
     url: "https://ai.stanford.edu/~ang/papers/nips01-discriminativegenerative.pdf"
   },
   {
+    id: "q_0047",
     cat: "Probability & Stats",
     q: "Bernoulli, Binomial, Multinomial — when to use each?",
     body: `
@@ -1438,6 +1507,7 @@ const CARDS = [
     url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
   },
   {
+    id: "q_0048",
     cat: "Probability & Stats",
     q: "When is the Poisson distribution the right model?",
     body: `
@@ -1461,6 +1531,7 @@ const CARDS = [
     url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
   },
   {
+    id: "q_0049",
     cat: "Probability & Stats",
     q: "Why is the Gaussian so central to statistics?",
     body: `
@@ -1475,6 +1546,7 @@ const CARDS = [
     url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
   },
   {
+    id: "q_0050",
     cat: "Probability & Stats",
     q: "What is the memoryless property, and which distributions have it?",
     body: `
@@ -1488,6 +1560,7 @@ const CARDS = [
     url: "https://www.elsevier.com/books/introduction-to-probability-models/ross/978-0-12-407948-9"
   },
   {
+    id: "q_0051",
     cat: "Probability & Stats",
     q: "Why is the Beta distribution the conjugate prior for Bernoulli/Binomial?",
     body: `
@@ -1502,6 +1575,7 @@ const CARDS = [
     url: "http://www.stat.columbia.edu/~gelman/book/"
   },
   {
+    id: "q_0052",
     cat: "Probability & Stats",
     q: "What is the Dirichlet distribution, and where does it show up in ML?",
     body: `
@@ -1523,6 +1597,7 @@ const CARDS = [
     url: "https://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf"
   },
   {
+    id: "q_0053",
     cat: "Probability & Stats",
     q: "When should you use Student's t instead of a Gaussian?",
     body: `
@@ -1536,6 +1611,7 @@ const CARDS = [
     url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
   },
   {
+    id: "q_0054",
     cat: "Probability & Stats",
     q: "What makes the multivariate Gaussian so useful?",
     body: `
@@ -1550,6 +1626,7 @@ const CARDS = [
     url: "https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/"
   },
   {
+    id: "q_0055",
     cat: "Probability & Stats",
     q: "Give definitions and key properties of expected value and variance.",
     body: `
@@ -1573,6 +1650,7 @@ const CARDS = [
     url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
   },
   {
+    id: "q_0056",
     cat: "Probability & Stats",
     q: "State the Law of Large Numbers vs the Central Limit Theorem in one line each.",
     body: `
@@ -1585,6 +1663,7 @@ const CARDS = [
     url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
   },
   {
+    id: "q_0057",
     cat: "Probability & Stats",
     q: "Define bias and variance of an estimator. What is MSE decomposition?",
     body: `
@@ -1608,6 +1687,7 @@ const CARDS = [
     url: "https://www.cengage.com/c/statistical-inference-2e-casella/9780534243128/"
   },
   {
+    id: "q_0058",
     cat: "Probability & Stats",
     q: "What does it mean for an estimator to be consistent and asymptotically normal?",
     body: `
@@ -1621,6 +1701,7 @@ const CARDS = [
     url: "https://www.cengage.com/c/statistical-inference-2e-casella/9780534243128/"
   },
   {
+    id: "q_0059",
     cat: "Probability & Stats",
     q: "Covariance vs correlation — same thing?",
     body: `
@@ -1641,6 +1722,7 @@ const CARDS = [
     url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
   },
   {
+    id: "q_0060",
     cat: "Probability & Stats",
     q: "What is conditional independence, and why does it matter?",
     body: `
@@ -1655,6 +1737,7 @@ const CARDS = [
     url: "https://mitpress.mit.edu/9780262013192/probabilistic-graphical-models/"
   },
   {
+    id: "q_0061",
     cat: "Probability & Stats",
     q: "State Jensen's inequality. Where does it appear in ML?",
     body: `
@@ -1676,6 +1759,7 @@ const CARDS = [
     url: "https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X"
   },
   {
+    id: "q_0062",
     cat: "Probability & Stats",
     q: "What are conjugate priors, and why are they useful?",
     body: `
@@ -1692,6 +1776,7 @@ const CARDS = [
     url: "http://www.stat.columbia.edu/~gelman/book/"
   },
   {
+    id: "q_0063",
     cat: "Probability & Stats",
     q: "What is the posterior predictive distribution, and why is it what you actually want?",
     body: `
@@ -1715,6 +1800,7 @@ const CARDS = [
     url: "http://www.stat.columbia.edu/~gelman/book/"
   },
   {
+    id: "q_0064",
     cat: "Probability & Stats",
     q: "How does Metropolis-Hastings work in one paragraph?",
     body: `
@@ -1742,6 +1828,7 @@ const CARDS = [
     url: "https://link.springer.com/book/10.1007/978-1-4757-4145-2"
   },
   {
+    id: "q_0065",
     cat: "Probability & Stats",
     q: "What is Gibbs sampling, and when is it a good choice?",
     body: `
@@ -1755,6 +1842,7 @@ const CARDS = [
     url: "https://ieeexplore.ieee.org/document/4767596"
   },
   {
+    id: "q_0066",
     cat: "Probability & Stats",
     q: "What does variational inference do, and how does it trade off vs MCMC?",
     body: `
@@ -1769,6 +1857,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1601.00670"
   },
   {
+    id: "q_0067",
     cat: "Probability & Stats",
     q: "What does a p-value actually mean, and what does it NOT mean?",
     body: `
@@ -1784,6 +1873,7 @@ const CARDS = [
     url: "https://www.tandfonline.com/doi/full/10.1080/00031305.2016.1154108"
   },
   {
+    id: "q_0068",
     cat: "Probability & Stats",
     q: "Define Type I error, Type II error, and statistical power.",
     body: `
@@ -1797,6 +1887,7 @@ const CARDS = [
     url: "https://www.routledge.com/Statistical-Power-Analysis-for-the-Behavioral-Sciences/Cohen/p/book/9780805802832"
   },
   {
+    id: "q_0069",
     cat: "Probability & Stats",
     q: "What is the multiple testing problem? Bonferroni vs Benjamini-Hochberg.",
     body: `
@@ -1810,6 +1901,7 @@ const CARDS = [
     url: "https://www.jstor.org/stable/2346101"
   },
   {
+    id: "q_0070",
     cat: "Probability & Stats",
     q: "What does a 95% confidence interval actually mean?",
     body: `
@@ -1824,6 +1916,7 @@ const CARDS = [
     url: "https://link.springer.com/book/10.1007/978-0-387-21736-9"
   },
   {
+    id: "q_0071",
     cat: "Probability & Stats",
     q: "How do you design a basic A/B test, and what are the common ways it goes wrong?",
     body: `
@@ -1837,6 +1930,7 @@ const CARDS = [
     url: "https://experimentguide.com/"
   },
   {
+    id: "q_0072",
     cat: "Probability & Stats",
     q: "Why is \"peeking\" at your A/B test dangerous, and how do you fix it?",
     body: `
@@ -1850,6 +1944,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1512.04922"
   },
   {
+    id: "q_0073",
     cat: "Probability & Stats",
     q: "What is entropy H(X), and what does it measure?",
     body: `
@@ -1872,6 +1967,7 @@ const CARDS = [
     url: "https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X"
   },
   {
+    id: "q_0074",
     cat: "Probability & Stats",
     q: "What does cross-entropy H(p, q) mean, and how does it relate to entropy and KL?",
     body: `
@@ -1894,6 +1990,7 @@ const CARDS = [
     url: "https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X"
   },
   {
+    id: "q_0075",
     cat: "Probability & Stats",
     q: "Define KL divergence. Why is it not a distance?",
     body: `
@@ -1916,6 +2013,7 @@ const CARDS = [
     url: "https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X"
   },
   {
+    id: "q_0076",
     cat: "Probability & Stats",
     q: "What is mutual information, and how does it relate to entropy?",
     body: `
@@ -1940,6 +2038,7 @@ const CARDS = [
     url: "https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X"
   },
   {
+    id: "q_0077",
     cat: "Probability & Stats",
     q: "Jensen-Shannon divergence — how does it relate to KL, and where is it used?",
     body: `
@@ -1966,6 +2065,7 @@ const CARDS = [
     url: "https://ieeexplore.ieee.org/document/61115"
   },
   {
+    id: "q_0078",
     cat: "Probability & Stats",
     q: "What is the bootstrap, and when should you use it?",
     body: `
@@ -1980,6 +2080,7 @@ const CARDS = [
     url: "https://www.crcpress.com/An-Introduction-to-the-Bootstrap/Efron-Tibshirani/p/book/9780412042317"
   },
   {
+    id: "q_0079",
     cat: "Probability & Stats",
     q: "What is reservoir sampling, and when do you reach for it?",
     body: `
@@ -1993,6 +2094,7 @@ const CARDS = [
     url: "https://dl.acm.org/doi/10.1145/3147.3165"
   },
   {
+    id: "q_0080",
     cat: "Probability & Stats",
     q: "What is the reparameterization trick, and why do we need it?",
     body: `
@@ -2007,6 +2109,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1312.6114"
   },
   {
+    id: "q_0081",
     cat: "Probability & Stats",
     q: "State Hoeffding's inequality. Why does it matter for ML?",
     body: `
@@ -2038,6 +2141,7 @@ const CARDS = [
     url: "https://global.oup.com/academic/product/concentration-inequalities-9780199535255"
   },
   {
+    id: "q_0082",
     cat: "Probability & Stats",
     q: "What is Simpson's paradox, and what does it teach about aggregating data?",
     body: `
@@ -2051,6 +2155,7 @@ const CARDS = [
     url: "https://bayes.cs.ucla.edu/BOOK-2K/"
   },
   {
+    id: "q_0083",
     cat: "Probability & Stats",
     q: "What is confounding, and what tools do we have to handle it?",
     body: `
@@ -2066,6 +2171,7 @@ const CARDS = [
     url: "https://miguelhernan.org/causalinferencebook/"
   },
   {
+    id: "q_0084",
     cat: "Probability & Stats",
     q: "What is Bayesian model averaging, and how does it differ from picking the best model?",
     body: `
@@ -2088,6 +2194,7 @@ const CARDS = [
     url: "https://www.jstor.org/stable/2676803"
   },
   {
+    id: "q_0085",
     cat: "Probability & Stats",
     q: "What are copulas, and why care about them?",
     body: `
@@ -2101,6 +2208,7 @@ const CARDS = [
     url: "https://link.springer.com/book/10.1007/0-387-28678-0"
   },
   {
+    id: "q_0086",
     cat: "Probability & Stats",
     q: "When to use t-test, chi-squared, ANOVA, and Kolmogorov-Smirnov?",
     body: `
@@ -2117,6 +2225,7 @@ const CARDS = [
 
   /* ===================== DEEP LEARNING ===================== */
   {
+    id: "q_0087",
     cat: "Deep Learning",
     q: "Explain backpropagation. What is it actually computing?",
     body: `
@@ -2141,6 +2250,7 @@ const CARDS = [
     url: "https://www.deeplearningbook.org/contents/mlp.html"
   },
   {
+    id: "q_0088",
     cat: "Deep Learning",
     q: "What causes vanishing/exploding gradients, and how do modern nets fix it?",
     body: `
@@ -2155,6 +2265,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1512.03385"
   },
   {
+    id: "q_0089",
     cat: "Deep Learning",
     q: "What does Batch Normalization compute, and why does it help?",
     body: `
@@ -2173,6 +2284,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1502.03167"
   },
   {
+    id: "q_0090",
     cat: "Deep Learning",
     q: "Write the Adam update. Why momentum and why the second moment?",
     body: `
@@ -2194,6 +2306,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1412.6980"
   },
   {
+    id: "q_0091",
     cat: "Deep Learning",
     q: "How does dropout regularize a network, and what changes at inference?",
     body: `
@@ -2207,6 +2320,7 @@ const CARDS = [
     url: "https://jmlr.org/papers/v15/srivastava14a.html"
   },
   {
+    id: "q_0092",
     cat: "Deep Learning",
     q: "Why do we need careful weight initialization? Contrast Xavier, He, and orthogonal init.",
     body: `
@@ -2232,6 +2346,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1502.01852"
   },
   {
+    id: "q_0093",
     cat: "Deep Learning",
     q: "Compare warmup+cosine, one-cycle, and step-decay LR schedules. Why does warmup matter?",
     body: `
@@ -2246,6 +2361,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1608.03983"
   },
   {
+    id: "q_0094",
     cat: "Deep Learning",
     q: "What is gradient clipping, and when is it necessary?",
     body: `
@@ -2267,6 +2383,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1211.5063"
   },
   {
+    id: "q_0095",
     cat: "Deep Learning",
     q: "How does mixed-precision training with fp16/bf16 work? What is loss scaling?",
     body: `
@@ -2280,6 +2397,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1710.03740"
   },
   {
+    id: "q_0096",
     cat: "Deep Learning",
     q: "What is gradient accumulation, and how does it relate to effective batch size?",
     body: `
@@ -2294,6 +2412,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1806.00187"
   },
   {
+    id: "q_0097",
     cat: "Deep Learning",
     q: "What is gradient checkpointing (activation recomputation), and what does it trade off?",
     body: `
@@ -2308,6 +2427,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1604.06174"
   },
   {
+    id: "q_0098",
     cat: "Deep Learning",
     q: "What is weight tying between input and output embeddings, and why does it help?",
     body: `
@@ -2322,6 +2442,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1608.05859"
   },
   {
+    id: "q_0099",
     cat: "Deep Learning",
     q: "What is label smoothing, and why does it help calibration?",
     body: `
@@ -2347,6 +2468,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1906.02629"
   },
   {
+    id: "q_0100",
     cat: "Deep Learning",
     q: "SGD+momentum vs Adam — which do you pick for which task, and why?",
     body: `
@@ -2360,6 +2482,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1705.08292"
   },
   {
+    id: "q_0101",
     cat: "Deep Learning",
     q: "What's the difference between Adam and AdamW? Why did people move to AdamW?",
     body: `
@@ -2388,6 +2511,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1711.05101"
   },
   {
+    id: "q_0102",
     cat: "Deep Learning",
     q: "What is Nesterov Accelerated Gradient, and how does it differ from plain momentum?",
     body: `
@@ -2411,6 +2535,7 @@ const CARDS = [
     url: "https://icml.cc/2013/wp-content/uploads/2013/03/sutskever13.pdf"
   },
   {
+    id: "q_0103",
     cat: "Deep Learning",
     q: "What is Sharpness-Aware Minimization (SAM), and why does it improve generalization?",
     body: `
@@ -2432,6 +2557,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2010.01412"
   },
   {
+    id: "q_0104",
     cat: "Deep Learning",
     q: "Second-order methods (Newton, K-FAC) should converge in fewer steps. Why don't we use them?",
     body: `
@@ -2445,6 +2571,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1503.05671"
   },
   {
+    id: "q_0105",
     cat: "Deep Learning",
     q: "What are Mixup and CutMix, and why do they regularize so effectively?",
     body: `
@@ -2469,6 +2596,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1710.09412"
   },
   {
+    id: "q_0106",
     cat: "Deep Learning",
     q: "What is stochastic depth (DropPath), and how does it differ from dropout?",
     body: `
@@ -2482,6 +2610,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1603.09382"
   },
   {
+    id: "q_0107",
     cat: "Deep Learning",
     q: "What is the double-descent phenomenon in deep learning?",
     body: `
@@ -2495,6 +2624,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1912.02292"
   },
   {
+    id: "q_0108",
     cat: "Deep Learning",
     q: "What is focal loss, and when should you use it?",
     body: `
@@ -2518,6 +2648,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1708.02002"
   },
   {
+    id: "q_0109",
     cat: "Deep Learning",
     q: "Write the InfoNCE loss. Why is it central to contrastive self-supervised learning?",
     body: `
@@ -2547,6 +2678,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1807.03748"
   },
   {
+    id: "q_0110",
     cat: "Deep Learning",
     q: "What inductive biases do CNNs have that Transformers lack, and when does that matter?",
     body: `
@@ -2560,6 +2692,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2010.11929"
   },
   {
+    id: "q_0111",
     cat: "Deep Learning",
     q: "What are depthwise separable convolutions, and why did MobileNet use them?",
     body: `
@@ -2574,6 +2707,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1704.04861"
   },
   {
+    id: "q_0112",
     cat: "Deep Learning",
     q: "What are Squeeze-and-Excitation (SE) blocks, and why do they help?",
     body: `
@@ -2588,6 +2722,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1709.01507"
   },
   {
+    id: "q_0113",
     cat: "Deep Learning",
     q: "What is a U-Net, and why is it the go-to for dense prediction?",
     body: `
@@ -2601,6 +2736,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1505.04597"
   },
   {
+    id: "q_0114",
     cat: "Deep Learning",
     q: "Contrast LSTM and GRU. When would you pick one over the other?",
     body: `
@@ -2614,6 +2750,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1406.1078"
   },
   {
+    id: "q_0115",
     cat: "Deep Learning",
     q: "How does a Vision Transformer (ViT) turn images into tokens? What's the CLS token for?",
     body: `
@@ -2629,6 +2766,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2010.11929"
   },
   {
+    id: "q_0116",
     cat: "Deep Learning",
     q: "How do diffusion models work? Explain the forward and reverse processes.",
     body: `
@@ -2655,6 +2793,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2006.11239"
   },
   {
+    id: "q_0117",
     cat: "Deep Learning",
     q: "Derive the ELBO for a VAE. Why is the reparameterization trick necessary?",
     body: `
@@ -2680,6 +2819,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1312.6114"
   },
   {
+    id: "q_0118",
     cat: "Deep Learning",
     q: "Why is GAN training unstable, and what is mode collapse?",
     body: `
@@ -2705,6 +2845,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1701.07875"
   },
   {
+    id: "q_0119",
     cat: "Deep Learning",
     q: "What is knowledge distillation? Why do soft labels help more than hard labels?",
     body: `
@@ -2730,6 +2871,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1503.02531"
   },
   {
+    id: "q_0120",
     cat: "Deep Learning",
     q: "Feature extraction vs full fine-tuning vs adapters — when do you use each?",
     body: `
@@ -2743,6 +2885,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1902.00751"
   },
   {
+    id: "q_0121",
     cat: "Deep Learning",
     q: "How does SimCLR do contrastive self-supervised learning on images?",
     body: `
@@ -2758,6 +2901,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2002.05709"
   },
   {
+    id: "q_0122",
     cat: "Deep Learning",
     q: "How does the Masked Autoencoder (MAE) do self-supervised learning, and how does it differ from BERT-style masking?",
     body: `
@@ -2775,6 +2919,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2111.06377"
   },
   {
+    id: "q_0123",
     cat: "Deep Learning",
     q: "Compare adapter methods for parameter-efficient fine-tuning.",
     body: `
@@ -2789,6 +2934,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2104.08691"
   },
   {
+    id: "q_0124",
     cat: "Deep Learning",
     q: "What is Model-Agnostic Meta-Learning (MAML)?",
     body: `
@@ -2811,6 +2957,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1703.03400"
   },
   {
+    id: "q_0125",
     cat: "Deep Learning",
     q: "What is the Neural Tangent Kernel (NTK), and what does it tell us about wide networks?",
     body: `
@@ -2834,6 +2981,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1806.07572"
   },
   {
+    id: "q_0126",
     cat: "Deep Learning",
     q: "What are flat vs sharp minima, and why do we think flatness matters for generalization?",
     body: `
@@ -2848,6 +2996,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1609.04836"
   },
   {
+    id: "q_0127",
     cat: "Deep Learning",
     q: "What is perceptual (VGG) loss, and why use it for image generation instead of L2?",
     body: `
@@ -2862,6 +3011,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1603.08155"
   },
   {
+    id: "q_0128",
     cat: "Deep Learning",
     q: "You have a 1:1000 class imbalance. What strategies actually work?",
     body: `
@@ -2877,6 +3027,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1901.05555"
   },
   {
+    id: "q_0129",
     cat: "Deep Learning",
     q: "What is test-time augmentation (TTA), and when is the trade-off worth it?",
     body: `
@@ -2890,6 +3041,7 @@ const CARDS = [
     url: "https://papers.nips.cc/paper/2012/hash/c399862d3b9d6b76c8436e924a68c45b-Abstract.html"
   },
   {
+    id: "q_0130",
     cat: "Deep Learning",
     q: "How do you measure and fix miscalibration in deep classifiers?",
     body: `
@@ -2913,6 +3065,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1706.04599"
   },
   {
+    id: "q_0131",
     cat: "Deep Learning",
     q: "Why does large-batch training hurt generalization, and what are the standard fixes?",
     body: `
@@ -2929,6 +3082,7 @@ const CARDS = [
 
   /* ===================== TRANSFORMERS & LLMs ===================== */
   {
+    id: "q_0132",
     cat: "Transformers & LLMs",
     q: "Write scaled dot-product attention. Why divide by √dₖ?",
     body: `
@@ -2948,6 +3102,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1706.03762"
   },
   {
+    id: "q_0133",
     cat: "Transformers & LLMs",
     q: "Why multi-head attention instead of one big attention?",
     body: `
@@ -2966,6 +3121,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1706.03762"
   },
   {
+    id: "q_0134",
     cat: "Transformers & LLMs",
     q: "Why do Transformers need positional encodings? What is RoPE?",
     body: `
@@ -2979,6 +3135,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2104.09864"
   },
   {
+    id: "q_0135",
     cat: "Transformers & LLMs",
     q: "What is the KV cache, and why is it essential for LLM inference?",
     body: `
@@ -2992,6 +3149,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2211.05102"
   },
   {
+    id: "q_0136",
     cat: "Transformers & LLMs",
     q: "Compare decoding strategies: greedy, beam, temperature, top-k, top-p.",
     body: `
@@ -3014,6 +3172,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1904.09751"
   },
   {
+    id: "q_0137",
     cat: "Transformers & LLMs",
     q: "Walk through the RLHF pipeline used to align LLMs.",
     body: `
@@ -3034,6 +3193,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2203.02155"
   },
   {
+    id: "q_0138",
     cat: "Transformers & LLMs",
     q: "What is LoRA, and why does it make fine-tuning cheap?",
     body: `
@@ -3057,6 +3217,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2106.09685"
   },
   {
+    id: "q_0139",
     cat: "Transformers & LLMs",
     q: "What do scaling laws / Chinchilla tell us about compute-optimal training?",
     body: `
@@ -3075,6 +3236,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2203.15556"
   },
   {
+    id: "q_0140",
     cat: "Transformers & LLMs",
     q: "What is perplexity, and how does it relate to cross-entropy loss?",
     body: `
@@ -3094,6 +3256,7 @@ const CARDS = [
     url: "https://web.stanford.edu/~jurafsky/slp3/"
   },
   {
+    id: "q_0141",
     cat: "Transformers & LLMs",
     q: "Compare encoder-only, decoder-only, and encoder-decoder Transformer architectures. When do you use each?",
     body: `
@@ -3107,6 +3270,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1706.03762"
   },
   {
+    id: "q_0142",
     cat: "Transformers & LLMs",
     q: "What is causal masking, and why does it enable autoregressive training in a single parallel pass?",
     body: `
@@ -3120,6 +3284,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1706.03762"
   },
   {
+    id: "q_0143",
     cat: "Transformers & LLMs",
     q: "Why do Transformers use LayerNorm rather than BatchNorm, and what's the pre-norm vs post-norm trade-off?",
     body: `
@@ -3145,6 +3310,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2002.04745"
   },
   {
+    id: "q_0144",
     cat: "Transformers & LLMs",
     q: "Why are residual connections critical in Transformers? What breaks without them?",
     body: `
@@ -3159,6 +3325,7 @@ const CARDS = [
     url: "https://transformer-circuits.pub/2021/framework/index.html"
   },
   {
+    id: "q_0145",
     cat: "Transformers & LLMs",
     q: "How does byte-pair encoding (BPE) work, and why is it preferred over word- or character-level tokens?",
     body: `
@@ -3177,6 +3344,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1508.07909"
   },
   {
+    id: "q_0146",
     cat: "Transformers & LLMs",
     q: "What are Multi-Query and Grouped-Query Attention, and what do they trade off against standard MHA?",
     body: `
@@ -3191,6 +3359,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2305.13245"
   },
   {
+    id: "q_0147",
     cat: "Transformers & LLMs",
     q: "What is Flash Attention, and what bottleneck does it fix?",
     body: `
@@ -3205,6 +3374,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2205.14135"
   },
   {
+    id: "q_0148",
     cat: "Transformers & LLMs",
     q: "Why is self-attention O(n&sup2;) in sequence length, and what are the leading long-context mitigations?",
     body: `
@@ -3220,6 +3390,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2009.06732"
   },
   {
+    id: "q_0149",
     cat: "Transformers & LLMs",
     q: "What is a Mixture-of-Experts layer, and why does it scale differently from a dense Transformer?",
     body: `
@@ -3246,6 +3417,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2101.03961"
   },
   {
+    id: "q_0150",
     cat: "Transformers & LLMs",
     q: "Why do modern LLMs use SwiGLU in the FFN instead of ReLU or GELU?",
     body: `
@@ -3270,6 +3442,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2002.05202"
   },
   {
+    id: "q_0151",
     cat: "Transformers & LLMs",
     q: "What is supervised fine-tuning (SFT / instruction tuning), and what are its limits?",
     body: `
@@ -3284,6 +3457,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2203.02155"
   },
   {
+    id: "q_0152",
     cat: "Transformers & LLMs",
     q: "What is DPO, and how does it eliminate the reward model from RLHF?",
     body: `
@@ -3312,6 +3486,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2305.18290"
   },
   {
+    id: "q_0153",
     cat: "Transformers & LLMs",
     q: "What is Retrieval-Augmented Generation (RAG), and when is it preferred over fine-tuning?",
     body: `
@@ -3326,6 +3501,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2005.11401"
   },
   {
+    id: "q_0154",
     cat: "Transformers & LLMs",
     q: "What is in-context learning, and how do current theories explain it?",
     body: `
@@ -3340,6 +3516,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2005.14165"
   },
   {
+    id: "q_0155",
     cat: "Transformers & LLMs",
     q: "What is chain-of-thought prompting, and when does it actually help?",
     body: `
@@ -3354,6 +3531,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2201.11903"
   },
   {
+    id: "q_0156",
     cat: "Transformers & LLMs",
     q: "Why do LLMs hallucinate, and how do we mitigate it?",
     body: `
@@ -3372,6 +3550,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2202.03629"
   },
   {
+    id: "q_0157",
     cat: "Transformers & LLMs",
     q: "Compare INT8 vs INT4 quantization for LLMs. What are GPTQ and AWQ?",
     body: `
@@ -3399,6 +3578,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2210.17323"
   },
   {
+    id: "q_0158",
     cat: "Transformers & LLMs",
     q: "How does speculative decoding accelerate LLM inference without changing outputs?",
     body: `
@@ -3424,6 +3604,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2211.17192"
   },
   {
+    id: "q_0159",
     cat: "Transformers & LLMs",
     q: "What is test-time compute scaling, and how does it differ from pretraining scaling?",
     body: `
@@ -3438,6 +3619,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2408.03314"
   },
   {
+    id: "q_0160",
     cat: "Transformers & LLMs",
     q: "Compare data, tensor, and pipeline parallelism for training LLMs. Where does FSDP / ZeRO fit?",
     body: `
@@ -3454,6 +3636,7 @@ const CARDS = [
 
   /* ===================== REINFORCEMENT LEARNING ===================== */
   {
+    id: "q_0161",
     cat: "Reinforcement Learning",
     q: "What is a Markov Decision Process and the agent–environment loop?",
     body: `
@@ -3478,6 +3661,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0162",
     cat: "Reinforcement Learning",
     q: "Write the Bellman expectation equation for Vᵖ and explain it.",
     body: `
@@ -3497,6 +3681,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0163",
     cat: "Reinforcement Learning",
     q: "Write the Q-learning update. Why is it off-policy?",
     body: `
@@ -3515,6 +3700,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0164",
     cat: "Reinforcement Learning",
     q: "What is the policy gradient theorem (REINFORCE)?",
     body: `
@@ -3536,6 +3722,7 @@ const CARDS = [
     url: "https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html"
   },
   {
+    id: "q_0165",
     cat: "Reinforcement Learning",
     q: "What is PPO's clipped objective, and why clip?",
     body: `
@@ -3556,6 +3743,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1707.06347"
   },
   {
+    id: "q_0166",
     cat: "Reinforcement Learning",
     q: "What is the exploration&ndash;exploitation dilemma?",
     body: `
@@ -3569,6 +3757,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0167",
     cat: "Reinforcement Learning",
     q: "What is a multi-armed bandit, and what does regret measure?",
     body: `
@@ -3593,6 +3782,7 @@ const CARDS = [
     url: "https://banditalgs.com/"
   },
   {
+    id: "q_0168",
     cat: "Reinforcement Learning",
     q: "How does UCB work, and why is it optimal for stochastic bandits?",
     body: `
@@ -3618,6 +3808,7 @@ const CARDS = [
     url: "https://link.springer.com/article/10.1023/A:1013689704352"
   },
   {
+    id: "q_0169",
     cat: "Reinforcement Learning",
     q: "What is Thompson sampling, and how does it explore?",
     body: `
@@ -3632,6 +3823,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1707.02038"
   },
   {
+    id: "q_0170",
     cat: "Reinforcement Learning",
     q: "What are contextual bandits, and where do they fit between bandits and full RL?",
     body: `
@@ -3646,6 +3838,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1003.0146"
   },
   {
+    id: "q_0171",
     cat: "Reinforcement Learning",
     q: "Define the return G<sub>t</sub> and explain the discount factor &#x03B3;.",
     body: `
@@ -3668,6 +3861,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0172",
     cat: "Reinforcement Learning",
     q: "V<sup>&#x03C0;</sup>(s) vs Q<sup>&#x03C0;</sup>(s, a) &mdash; what's the difference, and when do you use each?",
     body: `
@@ -3682,6 +3876,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0173",
     cat: "Reinforcement Learning",
     q: "What is the advantage function A(s, a), and why is it useful?",
     body: `
@@ -3704,6 +3899,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0174",
     cat: "Reinforcement Learning",
     q: "Write the optimal Bellman equation for Q*. How does it lead to Q-learning?",
     body: `
@@ -3729,6 +3925,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0175",
     cat: "Reinforcement Learning",
     q: "Compare policy iteration and value iteration for solving a known MDP.",
     body: `
@@ -3742,6 +3939,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0176",
     cat: "Reinforcement Learning",
     q: "Monte Carlo vs Temporal Difference &mdash; what's the trade-off?",
     body: `
@@ -3755,6 +3953,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0177",
     cat: "Reinforcement Learning",
     q: "What is TD(&#x03BB;), and what do eligibility traces do?",
     body: `
@@ -3778,6 +3977,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0178",
     cat: "Reinforcement Learning",
     q: "SARSA vs Q-learning &mdash; what's the difference?",
     body: `
@@ -3790,6 +3990,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0179",
     cat: "Reinforcement Learning",
     q: "What is Expected SARSA, and why can it beat both SARSA and Q-learning?",
     body: `
@@ -3821,6 +4022,7 @@ const CARDS = [
     url: "https://webdocs.cs.ualberta.ca/~sutton/papers/vSHSW-2009.pdf"
   },
   {
+    id: "q_0180",
     cat: "Reinforcement Learning",
     q: "Why does Q-learning overestimate values, and how does Double Q-learning fix it?",
     body: `
@@ -3834,6 +4036,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1509.06461"
   },
   {
+    id: "q_0181",
     cat: "Reinforcement Learning",
     q: "What is Fitted Q-Iteration (FQI)?",
     body: `
@@ -3848,6 +4051,7 @@ const CARDS = [
     url: "https://www.jmlr.org/papers/v6/ernst05a.html"
   },
   {
+    id: "q_0182",
     cat: "Reinforcement Learning",
     q: "How does Deep Q-Network (DQN) work? Two innovations that made it stable.",
     body: `
@@ -3861,6 +4065,7 @@ const CARDS = [
     url: "https://www.nature.com/articles/nature14236"
   },
   {
+    id: "q_0183",
     cat: "Reinforcement Learning",
     q: "What is prioritized experience replay?",
     body: `
@@ -3875,6 +4080,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1511.05952"
   },
   {
+    id: "q_0184",
     cat: "Reinforcement Learning",
     q: "What is Rainbow DQN made of?",
     body: `
@@ -3891,6 +4097,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1710.02298"
   },
   {
+    id: "q_0185",
     cat: "Reinforcement Learning",
     q: "What is an actor-critic algorithm?",
     body: `
@@ -3905,6 +4112,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0186",
     cat: "Reinforcement Learning",
     q: "A3C vs A2C &mdash; what's the difference?",
     body: `
@@ -3917,6 +4125,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1602.01783"
   },
   {
+    id: "q_0187",
     cat: "Reinforcement Learning",
     q: "How does DDPG handle continuous action spaces?",
     body: `
@@ -3932,6 +4141,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1509.02971"
   },
   {
+    id: "q_0188",
     cat: "Reinforcement Learning",
     q: "What three tricks does TD3 add to DDPG, and why?",
     body: `
@@ -3945,6 +4155,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1802.09477"
   },
   {
+    id: "q_0189",
     cat: "Reinforcement Learning",
     q: "What does SAC's max-entropy objective add on top of standard RL?",
     body: `
@@ -3970,6 +4181,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1801.01290"
   },
   {
+    id: "q_0190",
     cat: "Reinforcement Learning",
     q: "What is TRPO's trust-region idea?",
     body: `
@@ -4000,6 +4212,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1502.05477"
   },
   {
+    id: "q_0191",
     cat: "Reinforcement Learning",
     q: "What is Generalized Advantage Estimation (GAE)?",
     body: `
@@ -4022,6 +4235,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1506.02438"
   },
   {
+    id: "q_0192",
     cat: "Reinforcement Learning",
     q: "What is the natural policy gradient?",
     body: `
@@ -4044,6 +4258,7 @@ const CARDS = [
     url: "https://papers.nips.cc/paper/2001/hash/4b86abe48d358ecf194c56c69108433e-Abstract.html"
   },
   {
+    id: "q_0193",
     cat: "Reinforcement Learning",
     q: "On-policy vs off-policy &mdash; what does each mean, and what's the trade-off?",
     body: `
@@ -4056,6 +4271,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0194",
     cat: "Reinforcement Learning",
     q: "How does importance sampling correct off-policy value estimates?",
     body: `
@@ -4077,6 +4293,7 @@ const CARDS = [
     url: "https://scholarworks.umass.edu/cs_faculty_pubs/80/"
   },
   {
+    id: "q_0195",
     cat: "Reinforcement Learning",
     q: "Model-based vs model-free RL &mdash; when to choose each?",
     body: `
@@ -4090,6 +4307,7 @@ const CARDS = [
     url: "http://incompleteideas.net/book/the-book-2nd.html"
   },
   {
+    id: "q_0196",
     cat: "Reinforcement Learning",
     q: "What is Dyna-Q?",
     body: `
@@ -4103,6 +4321,7 @@ const CARDS = [
     url: "https://dl.acm.org/doi/10.1145/122344.122377"
   },
   {
+    id: "q_0197",
     cat: "Reinforcement Learning",
     q: "How do AlphaGo, AlphaZero, and MuZero differ?",
     body: `
@@ -4116,6 +4335,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1911.08265"
   },
   {
+    id: "q_0198",
     cat: "Reinforcement Learning",
     q: "What are world models in RL (Dreamer)?",
     body: `
@@ -4130,6 +4350,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2301.04104"
   },
   {
+    id: "q_0199",
     cat: "Reinforcement Learning",
     q: "What is hierarchical RL, and what are options?",
     body: `
@@ -4144,6 +4365,7 @@ const CARDS = [
     url: "https://people.cs.umass.edu/~barto/courses/cs687/Sutton-Precup-Singh-AIJ99.pdf"
   },
   {
+    id: "q_0200",
     cat: "Reinforcement Learning",
     q: "What is reward shaping, and what's a potential-based shaping guarantee?",
     body: `
@@ -4168,6 +4390,7 @@ const CARDS = [
     url: "https://ai.stanford.edu/~ang/papers/shaping-icml99.pdf"
   },
   {
+    id: "q_0201",
     cat: "Reinforcement Learning",
     q: "What is Hindsight Experience Replay (HER)?",
     body: `
@@ -4182,6 +4405,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1707.01495"
   },
   {
+    id: "q_0202",
     cat: "Reinforcement Learning",
     q: "Behavioral cloning vs inverse RL &mdash; what's the difference?",
     body: `
@@ -4195,6 +4419,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1011.0686"
   },
   {
+    id: "q_0203",
     cat: "Reinforcement Learning",
     q: "What is intrinsic motivation / curiosity, and why do we need it?",
     body: `
@@ -4209,6 +4434,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/1705.05363"
   },
   {
+    id: "q_0204",
     cat: "Reinforcement Learning",
     q: "What is offline (batch) RL, and why is it harder than online RL?",
     body: `
@@ -4223,6 +4449,7 @@ const CARDS = [
     url: "https://arxiv.org/abs/2005.01643"
   },
   {
+    id: "q_0205",
     cat: "Reinforcement Learning",
     q: "What is distributional RL (C51, QR-DQN), and why is it better than learning the mean?",
     body: `
@@ -4248,6 +4475,219 @@ const catClass = {
 };
 /* category display order for the filter chips */
 const CAT_ORDER = ["ML Foundations","Probability & Stats","Deep Learning","Transformers & LLMs","Reinforcement Learning"];
+const SESSION_TYPES = Object.freeze({
+  quick: Object.freeze({ id: "quick", label: "Quick Practice", length: 15 }),
+  full: Object.freeze({ id: "full", label: "Full Practice", length: 30 })
+});
+
+// Frozen compatibility map generated from the pre-migration category/question text.
+const LEGACY_QUESTION_ID_MAP = new Map([
+  ["card_1em2ulm", "q_0001"],
+  ["card_t5ltwq", "q_0002"],
+  ["card_fykg11", "q_0003"],
+  ["card_qocwjo", "q_0004"],
+  ["card_1c1ongj", "q_0005"],
+  ["card_1bag939", "q_0006"],
+  ["card_1o449yp", "q_0007"],
+  ["card_1vjb7x6", "q_0008"],
+  ["card_wqr6kp", "q_0009"],
+  ["card_huxel3", "q_0010"],
+  ["card_1i8nmok", "q_0011"],
+  ["card_4czvle", "q_0012"],
+  ["card_4yxjy6", "q_0013"],
+  ["card_1etm7q", "q_0014"],
+  ["card_1cdnas3", "q_0015"],
+  ["card_126fdvh", "q_0016"],
+  ["card_rtkjlr", "q_0017"],
+  ["card_yr32dj", "q_0018"],
+  ["card_1tpcynj", "q_0019"],
+  ["card_oqt2gd", "q_0020"],
+  ["card_14tkxlq", "q_0021"],
+  ["card_3u4hcj", "q_0022"],
+  ["card_hyh0e7", "q_0023"],
+  ["card_2fsvdj", "q_0024"],
+  ["card_iiqy8y", "q_0025"],
+  ["card_q02bep", "q_0026"],
+  ["card_kd5n4j", "q_0027"],
+  ["card_8dqdhu", "q_0028"],
+  ["card_1c5dsvz", "q_0029"],
+  ["card_1nu81ft", "q_0030"],
+  ["card_1gjnygn", "q_0031"],
+  ["card_o84o7k", "q_0032"],
+  ["card_18cgh9f", "q_0033"],
+  ["card_11tw4o4", "q_0034"],
+  ["card_15501u4", "q_0035"],
+  ["card_1svk2xt", "q_0036"],
+  ["card_1qla6tl", "q_0037"],
+  ["card_1rokq3o", "q_0038"],
+  ["card_1mdfija", "q_0039"],
+  ["card_1q2ezuh", "q_0040"],
+  ["card_jou4x7", "q_0041"],
+  ["card_gkfge9", "q_0042"],
+  ["card_sirp0e", "q_0043"],
+  ["card_1lvkrb7", "q_0044"],
+  ["card_15uqzs", "q_0045"],
+  ["card_u8q4bs", "q_0046"],
+  ["card_1uto0u5", "q_0047"],
+  ["card_155kq8a", "q_0048"],
+  ["card_9o5f51", "q_0049"],
+  ["card_1926dom", "q_0050"],
+  ["card_avk759", "q_0051"],
+  ["card_644zbb", "q_0052"],
+  ["card_1pag4yt", "q_0053"],
+  ["card_1ht0kb0", "q_0054"],
+  ["card_1gybtp7", "q_0055"],
+  ["card_3k3xdz", "q_0056"],
+  ["card_js6ls4", "q_0057"],
+  ["card_1kn7dt2", "q_0058"],
+  ["card_134ilpa", "q_0059"],
+  ["card_1hanjzm", "q_0060"],
+  ["card_1bxoyzz", "q_0061"],
+  ["card_1f1sox0", "q_0062"],
+  ["card_1yrb9uv", "q_0063"],
+  ["card_6x1t31", "q_0064"],
+  ["card_2r161b", "q_0065"],
+  ["card_jqyugq", "q_0066"],
+  ["card_dg3jff", "q_0067"],
+  ["card_1ffbdx0", "q_0068"],
+  ["card_fv3mfd", "q_0069"],
+  ["card_1ksywl4", "q_0070"],
+  ["card_16f7d1k", "q_0071"],
+  ["card_1wj21e6", "q_0072"],
+  ["card_1wvjt6f", "q_0073"],
+  ["card_1edtb8w", "q_0074"],
+  ["card_tpot9i", "q_0075"],
+  ["card_1m7z2ks", "q_0076"],
+  ["card_1gernqg", "q_0077"],
+  ["card_1fz7qpq", "q_0078"],
+  ["card_1tq2yac", "q_0079"],
+  ["card_plmn7x", "q_0080"],
+  ["card_1faj18j", "q_0081"],
+  ["card_1e7em5t", "q_0082"],
+  ["card_1evb1aj", "q_0083"],
+  ["card_8skkkl", "q_0084"],
+  ["card_hn62ku", "q_0085"],
+  ["card_1s4kz07", "q_0086"],
+  ["card_jzx8bu", "q_0087"],
+  ["card_oqahfw", "q_0088"],
+  ["card_hloo1x", "q_0089"],
+  ["card_1e7qri", "q_0090"],
+  ["card_1yhh5av", "q_0091"],
+  ["card_14yirkv", "q_0092"],
+  ["card_1j9htpu", "q_0093"],
+  ["card_102b0br", "q_0094"],
+  ["card_1374jv8", "q_0095"],
+  ["card_z1syqe", "q_0096"],
+  ["card_1wqqdv1", "q_0097"],
+  ["card_pfaf53", "q_0098"],
+  ["card_skr7s6", "q_0099"],
+  ["card_1qf97g7", "q_0100"],
+  ["card_10w9t1f", "q_0101"],
+  ["card_1xc1kam", "q_0102"],
+  ["card_x21yal", "q_0103"],
+  ["card_19auqk3", "q_0104"],
+  ["card_17obz4q", "q_0105"],
+  ["card_1v8l7m3", "q_0106"],
+  ["card_1ht39ux", "q_0107"],
+  ["card_f0oz2h", "q_0108"],
+  ["card_14nzyy9", "q_0109"],
+  ["card_1rne78d", "q_0110"],
+  ["card_1sa6fqh", "q_0111"],
+  ["card_jd3lhr", "q_0112"],
+  ["card_e5rhk6", "q_0113"],
+  ["card_2q4ckn", "q_0114"],
+  ["card_1vlz3c", "q_0115"],
+  ["card_138mqey", "q_0116"],
+  ["card_1h51hej", "q_0117"],
+  ["card_ak75d9", "q_0118"],
+  ["card_1mt4m7o", "q_0119"],
+  ["card_1uypodu", "q_0120"],
+  ["card_1hgyd9q", "q_0121"],
+  ["card_1cakjfg", "q_0122"],
+  ["card_1v5pipt", "q_0123"],
+  ["card_e2jima", "q_0124"],
+  ["card_uls71r", "q_0125"],
+  ["card_1tgc05c", "q_0126"],
+  ["card_1co7nwr", "q_0127"],
+  ["card_b9zvez", "q_0128"],
+  ["card_1e108ef", "q_0129"],
+  ["card_1m4p5oe", "q_0130"],
+  ["card_fa3z0u", "q_0131"],
+  ["card_ea0ob0", "q_0132"],
+  ["card_6s948h", "q_0133"],
+  ["card_4awjkq", "q_0134"],
+  ["card_v1ycy5", "q_0135"],
+  ["card_s9yrg", "q_0136"],
+  ["card_1cgqsyn", "q_0137"],
+  ["card_1it1mzm", "q_0138"],
+  ["card_e6va2n", "q_0139"],
+  ["card_1cketzi", "q_0140"],
+  ["card_12fkzl2", "q_0141"],
+  ["card_12qbeap", "q_0142"],
+  ["card_1ot4wfc", "q_0143"],
+  ["card_4o64h5", "q_0144"],
+  ["card_1hr3kpv", "q_0145"],
+  ["card_1v10c5h", "q_0146"],
+  ["card_9pjdjh", "q_0147"],
+  ["card_79t0iu", "q_0148"],
+  ["card_zqxfgc", "q_0149"],
+  ["card_1glo809", "q_0150"],
+  ["card_emg2m5", "q_0151"],
+  ["card_1tdopmj", "q_0152"],
+  ["card_umw7cx", "q_0153"],
+  ["card_sj2uwh", "q_0154"],
+  ["card_16yk9vc", "q_0155"],
+  ["card_14n5fnk", "q_0156"],
+  ["card_1ytlrkg", "q_0157"],
+  ["card_ne5vev", "q_0158"],
+  ["card_1dpzunt", "q_0159"],
+  ["card_1il40m9", "q_0160"],
+  ["card_1j4g1t0", "q_0161"],
+  ["card_95lrh9", "q_0162"],
+  ["card_1faeok5", "q_0163"],
+  ["card_lho8eo", "q_0164"],
+  ["card_1ql5pfz", "q_0165"],
+  ["card_g1ybf5", "q_0166"],
+  ["card_r9psi8", "q_0167"],
+  ["card_1mnzhrm", "q_0168"],
+  ["card_1tgeuq8", "q_0169"],
+  ["card_1r80hso", "q_0170"],
+  ["card_me1grb", "q_0171"],
+  ["card_hw14vf", "q_0172"],
+  ["card_68ukjd", "q_0173"],
+  ["card_eaj4yv", "q_0174"],
+  ["card_1o98w9b", "q_0175"],
+  ["card_zqjiso", "q_0176"],
+  ["card_16u4w7r", "q_0177"],
+  ["card_4mmgd8", "q_0178"],
+  ["card_1bnpwrn", "q_0179"],
+  ["card_ucezbh", "q_0180"],
+  ["card_1sqj51t", "q_0181"],
+  ["card_1jq5xyj", "q_0182"],
+  ["card_11qm3pn", "q_0183"],
+  ["card_1khj3uu", "q_0184"],
+  ["card_fnmqib", "q_0185"],
+  ["card_86079", "q_0186"],
+  ["card_1sjp1gd", "q_0187"],
+  ["card_1unqpyr", "q_0188"],
+  ["card_1fs8mwt", "q_0189"],
+  ["card_n48c0c", "q_0190"],
+  ["card_17uiqk3", "q_0191"],
+  ["card_1bqtc2r", "q_0192"],
+  ["card_1p5j3c9", "q_0193"],
+  ["card_1apluer", "q_0194"],
+  ["card_19swcho", "q_0195"],
+  ["card_1yykyxr", "q_0196"],
+  ["card_386p5j", "q_0197"],
+  ["card_12gy81r", "q_0198"],
+  ["card_wwur13", "q_0199"],
+  ["card_1f4pdxs", "q_0200"],
+  ["card_1lwl036", "q_0201"],
+  ["card_12fl16v", "q_0202"],
+  ["card_t6lbvl", "q_0203"],
+  ["card_ev61gx", "q_0204"],
+  ["card_hz4bsu", "q_0205"],
+]);
 
 const grid    = document.getElementById("grid");
 const chips   = document.getElementById("chips");
@@ -4255,16 +4695,173 @@ const countEl = document.getElementById("count");
 document.getElementById("total").textContent = CARDS.length;
 
 const PROGRESS_KEY = "aiml-interview-deck-progress";
+const SESSION_KEY = "aiml-interview-deck-session";
+const MIGRATION_STATE_KEY = "aiml-interview-deck-migrations";
+const QUESTION_ID_MIGRATION_VERSION = 1;
+const PERSISTENCE_SCHEMA_VERSION = 2;
+
+const storageRepository = {
+  read(key) {
+    try {
+      const value = localStorage.getItem(key);
+      return value === null ? null : JSON.parse(value);
+    } catch (error) {
+      console.warn(`Saved data for ${key} could not be loaded:`, error);
+      return null;
+    }
+  },
+  write(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      console.warn(`Data for ${key} could not be saved:`, error);
+      return false;
+    }
+  },
+  remove(key) {
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch (error) {
+      console.warn(`Saved data for ${key} could not be cleared:`, error);
+      return false;
+    }
+  }
+};
+
+const RATING_VALUES = new Set(["didnt_know", "almost", "knew_it"]);
+const cardsById = new Map(CARDS.map(question => [cardId(question), question]));
+
+function validateQuestionIdentity() {
+  const ids = CARDS.map(cardId);
+  const invalid = ids.filter(id => !/^q_\d{4}$/.test(id));
+  if (invalid.length || new Set(ids).size !== ids.length) {
+    throw new Error("Question IDs must be unique immutable values in q_0000 format.");
+  }
+}
+
+function resolvePersistedQuestionId(id) {
+  if (cardsById.has(id)) return id;
+  return LEGACY_QUESTION_ID_MAP.get(id) || null;
+}
+
+function recordTimestamp(record) {
+  const timestamp = Date.parse(record?.updatedAt || "");
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function migrateResponseKeys(responses) {
+  const migrated = {};
+  const sourceWasImmutable = {};
+  const unknown = {};
+
+  Object.entries(responses).forEach(([sourceId, record]) => {
+    const targetId = resolvePersistedQuestionId(sourceId);
+    if (!targetId) {
+      unknown[sourceId] = record;
+      return;
+    }
+
+    const isImmutable = cardsById.has(sourceId);
+    const current = migrated[targetId];
+    const shouldReplace = !current ||
+      recordTimestamp(record) > recordTimestamp(current) ||
+      (recordTimestamp(record) === recordTimestamp(current) && isImmutable && !sourceWasImmutable[targetId]);
+    if (shouldReplace) {
+      migrated[targetId] = record;
+      sourceWasImmutable[targetId] = isImmutable;
+    }
+  });
+
+  return { migrated, unknown };
+}
+
+function migrateProgressRecord() {
+  const saved = storageRepository.read(PROGRESS_KEY);
+  if (!saved) return { status: "not_found", mapped: 0, unknown: [] };
+  if (saved.schemaVersion === PERSISTENCE_SCHEMA_VERSION) {
+    return { status: "current", mapped: Object.keys(saved.responses || {}).length, unknown: [] };
+  }
+  if (saved.schemaVersion !== 1 || !saved.responses || typeof saved.responses !== "object") {
+    return { status: "unsupported_or_malformed", mapped: 0, unknown: [] };
+  }
+
+  const { migrated, unknown } = migrateResponseKeys(saved.responses);
+  const unmappedLegacyResponses = {
+    ...(saved.unmappedLegacyResponses || {}),
+    ...unknown
+  };
+  const upgraded = {
+    ...saved,
+    schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+    questionIdMigrationVersion: QUESTION_ID_MIGRATION_VERSION,
+    responses: migrated
+  };
+  if (Object.keys(unmappedLegacyResponses).length) {
+    upgraded.unmappedLegacyResponses = unmappedLegacyResponses;
+    console.warn("Some legacy progress references could not be mapped and were retained for recovery:", Object.keys(unknown));
+  }
+  storageRepository.write(PROGRESS_KEY, upgraded);
+  return {
+    status: "migrated",
+    mapped: Object.keys(migrated).length,
+    unknown: Object.keys(unknown)
+  };
+}
+
+function migrateSessionRecord() {
+  const saved = storageRepository.read(SESSION_KEY);
+  if (!saved) return { status: "not_found", mapped: 0, unknown: [] };
+  if (saved.schemaVersion === PERSISTENCE_SCHEMA_VERSION) {
+    return { status: "current", mapped: saved.cardIds?.length || 0, unknown: [] };
+  }
+  if (saved.schemaVersion !== 1 || !Array.isArray(saved.cardIds) ||
+      !saved.responses || typeof saved.responses !== "object") {
+    return { status: "unsupported_or_malformed", mapped: 0, unknown: [] };
+  }
+
+  const mappedCardIds = saved.cardIds.map(resolvePersistedQuestionId);
+  const { migrated: responses, unknown: unknownResponses } = migrateResponseKeys(saved.responses);
+  const unknownCardIds = saved.cardIds.filter((id, index) => !mappedCardIds[index]);
+  const unknown = [...new Set([...unknownCardIds, ...Object.keys(unknownResponses)])];
+  const resolvedCardIds = mappedCardIds.filter(Boolean);
+
+  if (unknown.length || new Set(resolvedCardIds).size !== resolvedCardIds.length) {
+    console.warn("The legacy session was preserved without changes because some question references were unknown or ambiguous:", unknown);
+    return { status: "preserved_unmappable", mapped: 0, unknown };
+  }
+
+  const upgraded = {
+    ...saved,
+    schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+    questionIdMigrationVersion: QUESTION_ID_MIGRATION_VERSION,
+    cardIds: resolvedCardIds,
+    responses
+  };
+  storageRepository.write(SESSION_KEY, upgraded);
+  return { status: "migrated", mapped: resolvedCardIds.length, unknown: [] };
+}
+
+function runQuestionIdMigration() {
+  const report = {
+    migrationVersion: QUESTION_ID_MIGRATION_VERSION,
+    ranAt: new Date().toISOString(),
+    progress: migrateProgressRecord(),
+    session: migrateSessionRecord()
+  };
+  storageRepository.write(MIGRATION_STATE_KEY, report);
+  return report;
+}
+
+validateQuestionIdentity();
+const questionIdMigration = runQuestionIdMigration();
 
 function loadProgress() {
-  const empty = { schemaVersion: 1, userId: null, responses: {} };
-  try {
-    const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY));
-    if (saved && saved.schemaVersion === 1 && saved.responses && typeof saved.responses === "object") {
-      return { ...empty, ...saved, responses: saved.responses };
-    }
-  } catch (error) {
-    console.warn("Saved progress could not be loaded:", error);
+  const empty = { schemaVersion: PERSISTENCE_SCHEMA_VERSION, userId: null, responses: {} };
+  const saved = storageRepository.read(PROGRESS_KEY);
+  if (saved && saved.schemaVersion === PERSISTENCE_SCHEMA_VERSION && saved.responses && typeof saved.responses === "object") {
+    return { ...empty, ...saved, responses: saved.responses };
   }
   return empty;
 }
@@ -4272,13 +4869,7 @@ function loadProgress() {
 const progress = loadProgress();
 
 function cardId(c) {
-  const value = `${c.cat}\u0000${c.q}`;
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `card_${(hash >>> 0).toString(36)}`;
+  return c.id;
 }
 
 function saveAssessment(id, rating) {
@@ -4286,18 +4877,8 @@ function saveAssessment(id, rating) {
     rating,
     updatedAt: new Date().toISOString()
   };
-  try {
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
-    return true;
-  } catch (error) {
-    console.warn("Progress could not be saved:", error);
-    return false;
-  }
+  return storageRepository.write(PROGRESS_KEY, progress);
 }
-
-const SESSION_KEY = "aiml-interview-deck-session";
-const RATING_VALUES = new Set(["didnt_know", "almost", "knew_it"]);
-const cardsById = new Map(CARDS.map(card => [cardId(card), card]));
 
 const sessionPanel = document.getElementById("session-panel");
 const sessionSetup = document.getElementById("session-setup");
@@ -4319,32 +4900,27 @@ function availableCategories() {
 }
 
 function loadSession() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(SESSION_KEY));
-    if (!saved || saved.schemaVersion !== 1 || !Array.isArray(saved.cardIds)) return null;
+  const saved = storageRepository.read(SESSION_KEY);
+  if (!saved || saved.schemaVersion !== PERSISTENCE_SCHEMA_VERSION || !Array.isArray(saved.cardIds)) return null;
 
-    const cardIds = [...new Set(saved.cardIds)].filter(id => cardsById.has(id));
-    if (!cardIds.length) return null;
+  const cardIds = [...new Set(saved.cardIds)].filter(id => cardsById.has(id));
+  if (!cardIds.length) return null;
 
-    const responses = {};
-    if (saved.responses && typeof saved.responses === "object") {
-      cardIds.forEach(id => {
-        const response = saved.responses[id];
-        if (response && RATING_VALUES.has(response.rating)) responses[id] = response;
-      });
-    }
-
-    return {
-      ...saved,
-      cardIds,
-      responses,
-      position: Math.min(Math.max(Number(saved.position) || 0, 0), cardIds.length - 1),
-      status: saved.status === "completed" ? "completed" : "active"
-    };
-  } catch (error) {
-    console.warn("Saved session could not be loaded:", error);
-    return null;
+  const responses = {};
+  if (saved.responses && typeof saved.responses === "object") {
+    cardIds.forEach(id => {
+      const response = saved.responses[id];
+      if (response && RATING_VALUES.has(response.rating)) responses[id] = response;
+    });
   }
+
+  return {
+    ...saved,
+    cardIds,
+    responses,
+    position: Math.min(Math.max(Number(saved.position) || 0, 0), cardIds.length - 1),
+    status: saved.status === "completed" ? "completed" : "active"
+  };
 }
 
 let session = loadSession();
@@ -4354,13 +4930,7 @@ let advancing = false;
 function saveSession() {
   if (!session) return false;
   session.updatedAt = new Date().toISOString();
-  try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    return true;
-  } catch (error) {
-    console.warn("Study session could not be saved:", error);
-    return false;
-  }
+  return storageRepository.write(SESSION_KEY, session);
 }
 
 function shuffle(items) {
@@ -4386,18 +4956,15 @@ function selectSessionCards(poolIds, requestedLength, previousIds = []) {
   return selected;
 }
 
-function beginSession({ sessionType, requestedLength, topic, poolIds, previousIds = [], preserveOrder = false }) {
-  const eligibleIds = poolIds || CARDS
-    .filter(card => topic === "All" || card.cat === topic)
-    .map(cardId);
+function createSessionState({ sessionType, requestedLength, topic, eligibleIds, previousIds = [], preserveOrder = false }) {
   const cardIds = preserveOrder
     ? [...new Set(eligibleIds)].filter(id => cardsById.has(id)).slice(0, requestedLength)
     : selectSessionCards(eligibleIds, requestedLength, previousIds);
-  if (!cardIds.length) return;
+  if (!cardIds.length) return null;
 
   const now = new Date().toISOString();
-  session = {
-    schemaVersion: 1,
+  return {
+    schemaVersion: PERSISTENCE_SCHEMA_VERSION,
     userId: null,
     sessionId: `session_${Date.now().toString(36)}`,
     sessionType,
@@ -4410,6 +4977,23 @@ function beginSession({ sessionType, requestedLength, topic, poolIds, previousId
     startedAt: now,
     updatedAt: now
   };
+}
+
+function beginSession({ sessionType, requestedLength, topic, poolIds, previousIds = [], preserveOrder = false }) {
+  const eligibleIds = poolIds || CARDS
+    .filter(card => topic === "All" || card.cat === topic)
+    .map(cardId);
+  const nextSession = createSessionState({
+    sessionType,
+    requestedLength,
+    topic,
+    eligibleIds,
+    previousIds,
+    preserveOrder
+  });
+  if (!nextSession) return;
+
+  session = nextSession;
   saveSession();
   showSession();
 }
@@ -4419,8 +5003,7 @@ function refreshSessionLauncher() {
   resumePrompt.hidden = !resumable;
   sessionSetup.hidden = resumable;
   if (resumable) {
-    const label = session.sessionType === "quick" ? "Quick Practice" :
-      session.sessionType === "full" ? "Full Practice" : "Weak Areas";
+    const label = SESSION_TYPES[session.sessionType]?.label || "Weak Areas";
     resumeCopy.textContent = `${label} · Question ${session.position + 1} of ${session.cardIds.length}`;
   }
 }
@@ -4477,20 +5060,27 @@ function completeSession() {
   showSummary();
 }
 
-function sessionCounts() {
+function calculateSessionResults(sessionState) {
   const counts = { knew_it: 0, almost: 0, didnt_know: 0 };
-  session.cardIds.forEach(id => {
-    const rating = session.responses[id]?.rating;
+  sessionState.cardIds.forEach(id => {
+    const rating = sessionState.responses[id]?.rating;
     if (RATING_VALUES.has(rating)) counts[rating]++;
   });
-  return counts;
+  const total = sessionState.cardIds.length;
+  return {
+    counts,
+    total,
+    confidence: total ? Math.round((counts.knew_it / total) * 100) : 0,
+    weakCardIds: sessionState.cardIds.filter(id => {
+      const rating = sessionState.responses[id]?.rating;
+      return rating === "didnt_know" || rating === "almost";
+    })
+  };
 }
 
 function showSummary() {
   if (!session || session.status !== "completed") return showDeck();
-  const counts = sessionCounts();
-  const total = session.cardIds.length;
-  const confident = Math.round((counts.knew_it / total) * 100);
+  const { counts, total, confidence, weakCardIds } = calculateSessionResults(session);
   sessionPanel.hidden = true;
   browseView.hidden = true;
   sessionView.hidden = true;
@@ -4500,14 +5090,15 @@ function showSummary() {
     <div class="summary-result"><b>${counts.knew_it}</b><span>Knew It</span></div>
     <div class="summary-result"><b>${counts.almost}</b><span>Almost</span></div>
     <div class="summary-result"><b>${counts.didnt_know}</b><span>Didn't Know</span></div>`;
-  document.getElementById("summary-confidence").textContent = `${confident}% confidently answered`;
-  document.getElementById("practice-weak").hidden = counts.almost + counts.didnt_know === 0;
+  document.getElementById("summary-confidence").textContent = `${confidence}% confidently answered`;
+  document.getElementById("practice-weak").hidden = weakCardIds.length === 0;
   window.scrollTo({ top: sessionSummary.offsetTop - 20, behavior: "smooth" });
 }
 
 function startWeakSession() {
-  const didntKnow = shuffle(session.cardIds.filter(id => session.responses[id]?.rating === "didnt_know"));
-  const almost = shuffle(session.cardIds.filter(id => session.responses[id]?.rating === "almost"));
+  const { weakCardIds } = calculateSessionResults(session);
+  const didntKnow = shuffle(weakCardIds.filter(id => session.responses[id]?.rating === "didnt_know"));
+  const almost = shuffle(weakCardIds.filter(id => session.responses[id]?.rating === "almost"));
   const weakIds = [...didntKnow, ...almost];
   if (!weakIds.length) return;
   beginSession({
@@ -4632,10 +5223,11 @@ function makeCard(c, options = {}) {
 
 document.querySelectorAll("[data-session-type]").forEach(button => {
   button.addEventListener("click", () => {
-    const type = button.dataset.sessionType;
+    const type = SESSION_TYPES[button.dataset.sessionType];
+    if (!type) return;
     beginSession({
-      sessionType: type,
-      requestedLength: type === "quick" ? 15 : 30,
+      sessionType: type.id,
+      requestedLength: type.length,
       topic: sessionTopic.value
     });
   });
@@ -4644,11 +5236,7 @@ document.querySelectorAll("[data-session-type]").forEach(button => {
 document.getElementById("resume-session").addEventListener("click", showSession);
 document.getElementById("new-session").addEventListener("click", () => {
   session = null;
-  try {
-    localStorage.removeItem(SESSION_KEY);
-  } catch (error) {
-    console.warn("Saved session could not be cleared:", error);
-  }
+  storageRepository.remove(SESSION_KEY);
   resumePrompt.hidden = true;
   sessionSetup.hidden = false;
 });
