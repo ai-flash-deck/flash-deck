@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AI/ML Interview Deck regression tests</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 850px; margin: 2rem auto; padding: 0 1rem; }
+    .pass { color: #08783f; } .fail { color: #b42318; }
+    iframe { display: none; }
+  </style>
+</head>
+<body data-status="running">
+  <h1>Core regression tests</h1>
+  <p id="summary">Running…</p>
+  <ol id="results"></ol>
+  <iframe id="app" src="../index.html?regression-test=1"></iframe>
+  <script>
+    const tests = [];
+    const test = (name, run) => tests.push({ name, run });
+    const assert = (condition, message = "assertion failed") => {
+      if (!condition) throw new Error(message);
+    };
+    const equal = (actual, expected, message = "values differ") => {
+      assert(JSON.stringify(actual) === JSON.stringify(expected),
+        `${message}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    };
+
+    document.getElementById("app").addEventListener("load", async event => {
+      const app = event.currentTarget.contentWindow;
+      const api = app.eval(`({
+        CARDS, TOPICS, topicsById, SESSION_TYPES, LEGACY_QUESTION_ID_MAP, PERSISTENCE_SCHEMA_VERSION,
+        PROGRESS_KEY, SESSION_KEY, storageRepository, cardId, cardsById,
+        resolvePersistedQuestionId, migrateResponseKeys, migrateProgressRecord,
+        migrateSessionRecord, loadProgress, loadSession, createSessionState,
+        calculateSessionResults, canonicalAssessmentResult, createAssessmentEvent,
+        assessQuestionPresentation, makeCard, progress, assessmentHistoryRepository,
+        deriveQuestionProgress, isValidAssessmentEvent
+      })`);
+      const cards = api.CARDS;
+      const ids = cards.map(api.cardId);
+      const topic = api.TOPICS[0];
+      const topicQuestionIds = cards.filter(card => card.topicId === topic.id).map(api.cardId);
+      const legacyEntry = [...api.LEGACY_QUESTION_ID_MAP.entries()][0];
+      const stamp = "2026-01-01T00:00:00.000Z";
+      const response = rating => ({ rating, updatedAt: stamp });
+      let eventSequence = 0;
+      const eventRecord = (questionId, result, sessionId = null, assessedAt = stamp) => ({ id: `event_${++eventSequence}`, questionId, sessionId, result, assessedAt });
+      const originalProgress = app.localStorage.getItem(api.PROGRESS_KEY);
+      const originalSession = app.localStorage.getItem(api.SESSION_KEY);
+      const restoreStorage = () => {
+        if (originalProgress === null) app.localStorage.removeItem(api.PROGRESS_KEY);
+        else app.localStorage.setItem(api.PROGRESS_KEY, originalProgress);
+        if (originalSession === null) app.localStorage.removeItem(api.SESSION_KEY);
+        else app.localStorage.setItem(api.SESSION_KEY, originalSession);
+      };
+
+      test("T1: exactly 205 questions exist", () => equal(cards.length, 205));
+      test("T2: all 205 immutable IDs are unique", () => equal(new Set(ids).size, 205));
+      test("T3: no duplicate immutable IDs exist", () => equal(ids.length, new Set(ids).size));
+      test("T4: Quick Practice selects at most 15 questions", () => {
+        const session = api.createSessionState({ sessionType: "quick", requestedLength: api.SESSION_TYPES.quick.length, topicId: "all", eligibleIds: ids });
+        assert(session.cardIds.length <= 15);
+      });
+      test("T5: Full Practice selects at most 30 questions", () => {
+        const session = api.createSessionState({ sessionType: "full", requestedLength: api.SESSION_TYPES.full.length, topicId: "all", eligibleIds: ids });
+        assert(session.cardIds.length <= 30);
+      });
+      test("T6: a small topic pool uses only available questions", () => {
+        const session = api.createSessionState({ sessionType: "quick", requestedLength: 15, topicId: topic.id, eligibleIds: topicQuestionIds.slice(0, 3) });
+        equal(session.cardIds.length, 3);
+      });
+      test("T7: a normal session contains no duplicate questions", () => {
+        const session = api.createSessionState({ sessionType: "full", requestedLength: 30, topicId: "all", eligibleIds: [...ids, ...ids] });
+        equal(session.cardIds.length, new Set(session.cardIds).size);
+      });
+      test("T8: every selected question belongs to the requested topic", () => {
+        const quick = api.createSessionState({ sessionType: "quick", requestedLength: 15, topicId: topic.id, eligibleIds: topicQuestionIds });
+        const full = api.createSessionState({ sessionType: "full", requestedLength: 30, topicId: topic.id, eligibleIds: topicQuestionIds });
+        assert([...quick.cardIds, ...full.cardIds].every(id => api.cardsById.get(id).topicId === topic.id));
+      });
+      test("T9: mixed results produce correct counts and percentage", () => {
+        equal(api.calculateSessionResults({ cardIds: ids.slice(0, 3), responses: {
+          [ids[0]]: eventRecord(ids[0], "known"), [ids[1]]: eventRecord(ids[1], "known"), [ids[2]]: eventRecord(ids[2], "needs_review")
+        }}), { counts: { known: 2, needs_review: 1 }, total: 3, confidence: 67, weakCardIds: [ids[2]] });
+      });
+      test("T10: all-known results are correct", () => {
+        const selected = ids.slice(0, 2);
+        const result = api.calculateSessionResults({ cardIds: selected, responses: Object.fromEntries(selected.map(id => [id, eventRecord(id, "known")])) });
+        equal([result.counts.known, result.confidence, result.weakCardIds.length], [2, 100, 0]);
+      });
+      test("T11: all-needs-review results are correct", () => {
+        const selected = ids.slice(0, 2);
+        const result = api.calculateSessionResults({ cardIds: selected, responses: Object.fromEntries(selected.map(id => [id, eventRecord(id, "needs_review")])) });
+        equal([result.counts.needs_review, result.confidence, result.weakCardIds], [2, 0, selected]);
+      });
+      test("T12: empty and invalid result input falls back safely", () => {
+        equal(api.calculateSessionResults(), { counts: { known: 0, needs_review: 0 }, total: 0, confidence: 0, weakCardIds: [] });
+      });
+      test("T13: a known legacy ID maps to its immutable ID", () => equal(api.resolvePersistedQuestionId(legacyEntry[0]), legacyEntry[1]));
+      test("T14: legacy progress records migrate correctly", () => {
+        app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 1, userId: null, responses: { [legacyEntry[0]]: response("almost") } }));
+        equal(api.migrateProgressRecord().status, "migrated");
+        const saved = JSON.parse(app.localStorage.getItem(api.PROGRESS_KEY));
+        equal([saved.schemaVersion, saved.assessmentEvents[0].result], [4, "needs_review"]);
+      });
+      test("T15: legacy session references migrate correctly", () => {
+        app.localStorage.setItem(api.SESSION_KEY, JSON.stringify({ schemaVersion: 1, userId: null, topic: "All", cardIds: [legacyEntry[0]], responses: { [legacyEntry[0]]: response("knew_it") } }));
+        equal(api.migrateSessionRecord().status, "migrated");
+        const saved = JSON.parse(app.localStorage.getItem(api.SESSION_KEY));
+        equal([saved.schemaVersion, saved.cardIds[0], saved.responses[legacyEntry[1]].result], [4, legacyEntry[1], "known"]);
+      });
+      test("T16: running migration twice is idempotent", () => {
+        app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 1, responses: { [legacyEntry[0]]: response("almost") } }));
+        api.migrateProgressRecord();
+        const once = app.localStorage.getItem(api.PROGRESS_KEY);
+        equal(api.migrateProgressRecord().status, "current");
+        equal(app.localStorage.getItem(api.PROGRESS_KEY), once);
+      });
+      test("T17: unknown legacy progress is preserved for recovery", () => {
+        app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 1, responses: { card_unknown: response("almost") } }));
+        const report = api.migrateProgressRecord();
+        const saved = JSON.parse(app.localStorage.getItem(api.PROGRESS_KEY));
+        equal(report.unknown, ["card_unknown"]);
+        equal(saved.unmappedLegacyResponses.card_unknown.rating, "almost");
+      });
+      test("T18: malformed persisted data does not crash migration", () => {
+        app.localStorage.setItem(api.PROGRESS_KEY, "{broken");
+        equal(api.migrateProgressRecord().status, "not_found");
+      });
+      test("T19: valid current-version records load correctly", () => {
+        const event = eventRecord(ids[0], "known");
+        app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 4, userId: null, assessmentEvents: [event] }));
+        equal(api.loadProgress().assessmentEvents[0].result, "known");
+      });
+      test("T20: corrupted records fall back safely", () => {
+        app.localStorage.setItem(api.PROGRESS_KEY, "not-json");
+        equal(api.loadProgress(), { schemaVersion: 4, userId: null, assessmentEvents: [] });
+      });
+      test("T21: every topic has an explicit stable ID", () => assert(api.TOPICS.every(topic => topic.id && topic.name)));
+      test("T22: topic IDs are unique", () => equal(new Set(api.TOPICS.map(topic => topic.id)).size, api.TOPICS.length));
+      test("T23: every question resolves to a valid topic", () => assert(cards.every(card => api.topicsById.has(card.topicId))));
+      test("T24: Knew It maps to known independently of its label", () => equal(api.canonicalAssessmentResult("knew_it"), "known"));
+      test("T25: Didn't Know maps to needs_review independently of its label", () => equal(api.canonicalAssessmentResult("didnt_know"), "needs_review"));
+      test("T26: assessment is prohibited before reveal", () => {
+        const result = api.assessQuestionPresentation({ revealed: false, questionId: ids[0], sessionId: "session_test", result: "known", timestamp: stamp });
+        equal(result, { recorded: false, event: null });
+      });
+      test("T27: duplicate assessment is suppressed for one presentation", () => {
+        const previousEvent = eventRecord(ids[0], "known", "session_test");
+        const result = api.assessQuestionPresentation({ revealed: true, previousEvent, questionId: ids[0], sessionId: "session_test", result: "known", timestamp: "2027-01-01T00:00:00.000Z" });
+        assert(!result.recorded && result.event === previousEvent);
+      });
+      test("T28: assessment references immutable question ID and session", () => {
+        const event = api.createAssessmentEvent({ id: "event_contract", questionId: ids[0], sessionId: "session_test", result: "known", assessedAt: stamp });
+        equal(event, { id: "event_contract", questionId: ids[0], sessionId: "session_test", result: "known", assessedAt: stamp });
+      });
+      test("T29: schema-2 topic and assessment data migrate and remain loadable", () => {
+        app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 2, userId: null, responses: { [ids[0]]: response("knew_it") } }));
+        app.localStorage.setItem(api.SESSION_KEY, JSON.stringify({ schemaVersion: 2, sessionId: "session_old", topic: topic.name, cardIds: [ids[0]], responses: { [ids[0]]: response("almost") } }));
+        equal(api.migrateProgressRecord().status, "migrated");
+        equal(api.migrateSessionRecord().status, "migrated");
+        const loaded = api.loadSession();
+        equal([api.loadProgress().assessmentEvents[0].result, loaded.topicId, loaded.responses[ids[0]].result], ["known", topic.id, "needs_review"]);
+      });
+      test("T30: card UI enforces reveal and suppresses a repeated click", () => {
+        const id = ids[0];
+        const originalLength = api.progress.assessmentEvents.length;
+        let received = null;
+        const card = api.makeCard(cards[0], { sessionId: "session_ui", onAssess: event => { received = event; } });
+        const known = card.querySelector('[data-result="known"]');
+        known.click();
+        equal(received, null);
+        card.querySelector(".front").click();
+        known.click();
+        assert(received?.questionId === id && received?.sessionId === "session_ui" && received?.result === "known");
+        const firstTimestamp = received.timestamp;
+        known.click();
+        equal(received.timestamp, firstTimestamp);
+        api.progress.assessmentEvents.splice(originalLength);
+      });
+      test("T31: one needs-review event derives needs-review status", () => {
+        const events = [eventRecord(ids[0], "needs_review", "session_a", "2026-01-01T00:00:00.000Z")];
+        equal(api.deriveQuestionProgress(events, ids[0]).currentStatus, "needs_review");
+      });
+      test("T32: needs-review followed by known derives known", () => {
+        const events = [
+          eventRecord(ids[0], "needs_review", "session_a", "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[0], "known", "session_b", "2026-01-02T00:00:00.000Z")
+        ];
+        equal(api.deriveQuestionProgress(events, ids[0]).currentStatus, "known");
+      });
+      test("T33: known followed by needs-review derives needs-review", () => {
+        const events = [
+          eventRecord(ids[0], "known", "session_a", "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[0], "needs_review", "session_b", "2026-01-02T00:00:00.000Z")
+        ];
+        equal(api.deriveQuestionProgress(events, ids[0]).currentStatus, "needs_review");
+      });
+      test("T34: history from multiple sessions derives each question independently", () => {
+        const events = [
+          eventRecord(ids[0], "needs_review", "session_a", "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[1], "known", "session_a", "2026-01-01T00:01:00.000Z"),
+          eventRecord(ids[0], "known", "session_b", "2026-01-02T00:00:00.000Z")
+        ];
+        equal([api.deriveQuestionProgress(events, ids[0]).currentStatus, api.deriveQuestionProgress(events, ids[1]).currentStatus], ["known", "known"]);
+      });
+      test("T35: derived counters and last-reviewed time are correct", () => {
+        const events = [
+          eventRecord(ids[0], "needs_review", "session_a", "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[0], "known", "session_b", "2026-01-02T00:00:00.000Z"),
+          eventRecord(ids[0], "known", "session_c", "2026-01-03T00:00:00.000Z")
+        ];
+        const derived = api.deriveQuestionProgress(events, ids[0]);
+        equal([derived.timesAssessed, derived.timesKnown, derived.timesNeedsReview, derived.lastReviewedAt], [3, 2, 1, "2026-01-03T00:00:00.000Z"]);
+      });
+      test("T36: current history survives a repository reload", () => {
+        const event = eventRecord(ids[0], "known", "session_reload");
+        app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 4, userId: null, assessmentEvents: [event] }));
+        equal(api.loadProgress().assessmentEvents, [event]);
+      });
+      test("T37: malformed and unknown-question history fails safely", () => {
+        const unknown = { id: "unknown_event", questionId: "q_unknown", sessionId: null, result: "known", assessedAt: stamp };
+        app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 4, assessmentEvents: [null, unknown, { id: "broken" }] }));
+        const loaded = api.loadProgress();
+        equal(loaded.assessmentEvents, []);
+        equal(loaded.unmappedAssessmentEvents.length, 3);
+      });
+      test("T38: repository rejects a duplicate event ID", () => {
+        const originalLength = api.progress.assessmentEvents.length;
+        const event = eventRecord(ids[0], "known", "session_duplicate");
+        assert(api.assessmentHistoryRepository.append(event));
+        assert(!api.assessmentHistoryRepository.append(event));
+        equal(api.progress.assessmentEvents.filter(candidate => candidate.id === event.id).length, 1);
+        api.progress.assessmentEvents.splice(originalLength);
+      });
+      test("T39: repository retains events from subsequent sessions", () => {
+        const originalLength = api.progress.assessmentEvents.length;
+        const first = eventRecord(ids[0], "needs_review", "session_first", "2026-01-01T00:00:00.000Z");
+        const second = eventRecord(ids[0], "known", "session_second", "2026-01-02T00:00:00.000Z");
+        assert(api.assessmentHistoryRepository.append(first));
+        assert(api.assessmentHistoryRepository.append(second));
+        const reloaded = api.loadProgress().assessmentEvents.filter(event => event.id === first.id || event.id === second.id);
+        equal(reloaded.map(event => event.id), [first.id, second.id]);
+        api.progress.assessmentEvents.splice(originalLength);
+      });
+      test("T40: schema-3 latest status migrates to one truthful event", () => {
+        const legacy = { questionId: ids[0], sessionId: "session_legacy", result: "known", timestamp: stamp };
+        app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 3, userId: null, responses: { [ids[0]]: legacy } }));
+        equal(api.migrateProgressRecord().status, "migrated");
+        const saved = JSON.parse(app.localStorage.getItem(api.PROGRESS_KEY));
+        equal([saved.assessmentEvents.length, saved.assessmentEvents[0].questionId, saved.assessmentEvents[0].result], [1, ids[0], "known"]);
+      });
+      test("T41: migration does not invent a timestamp for incomplete legacy data", () => {
+        app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 3, responses: { [ids[0]]: { questionId: ids[0], result: "known" } } }));
+        const report = api.migrateProgressRecord();
+        const saved = JSON.parse(app.localStorage.getItem(api.PROGRESS_KEY));
+        equal(report.unknown, [ids[0]]);
+        equal(saved.assessmentEvents, []);
+        equal(saved.unmappedLegacyResponses[ids[0]].result, "known");
+      });
+      test("T42: failed history persistence does not record the UI assessment", () => {
+        const originalAppend = api.assessmentHistoryRepository.append;
+        let received = null;
+        api.assessmentHistoryRepository.append = () => false;
+        try {
+          const card = api.makeCard(cards[0], { sessionId: "session_failure", onAssess: event => { received = event; } });
+          card.querySelector(".front").click();
+          const known = card.querySelector('[data-result="known"]');
+          known.click();
+          equal(received, null);
+          equal(known.getAttribute("aria-pressed"), "false");
+          assert(card.querySelector(".assessment-status").textContent.includes("could not be saved"));
+        } finally {
+          api.assessmentHistoryRepository.append = originalAppend;
+        }
+      });
+
+      let passed = 0;
+      const list = document.getElementById("results");
+      for (const current of tests) {
+        const item = document.createElement("li");
+        try {
+          await current.run();
+          passed++;
+          item.className = "pass";
+          item.textContent = `PASS — ${current.name}`;
+        } catch (error) {
+          item.className = "fail";
+          item.textContent = `FAIL — ${current.name}: ${error.message}`;
+        }
+        list.appendChild(item);
+      }
+      restoreStorage();
+      const failed = tests.length - passed;
+      document.getElementById("summary").textContent = `${passed}/${tests.length} passed; ${failed} failed`;
+      document.body.dataset.status = failed ? "failed" : "passed";
+    });
+  </script>
+</body>
+</html>

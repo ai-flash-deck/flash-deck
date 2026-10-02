@@ -62,6 +62,7 @@ All flashcards live in the `CARDS` array inside `index.html`. Each entry is:
 ```js
 {
   id:  "q_0001",              // immutable question identity
+  topicId: "transformers_llms", // immutable topic relationship
   cat: "Transformers & LLMs",   // category (drives the filter chip + color)
   q:   "Question text",
   body: `<p class="answer">...</p> <div class="eq"><math>...</math></div>`,
@@ -75,6 +76,29 @@ category. After changing `index.html` or any asset, bump `CACHE_VERSION` in `sw.
 (e.g. `aiml-deck-v1` → `v2`) so installed clients fetch the new version instead of the cached one.
 
 ## Test locally
+
+### Automated regression tests
+
+Run the dependency-free core regression suite from PowerShell:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
+```
+
+The runner starts a temporary loopback-only static server and uses the installed
+Microsoft Edge JavaScript runtime. It does not install packages or access the
+internet. The 42 tests cover the 205 immutable question IDs, stable topic IDs,
+canonical assessment semantics, reveal and duplicate guards, Quick and Full
+session selection, result calculation, multi-session assessment history, derived
+status and counters, reload persistence, legacy ID and storage-schema migration,
+migration idempotency, unknown IDs, and malformed or corrupted browser storage.
+The test page loads the real `index.html`, so these checks execute the production
+functions and production card data.
+
+To inspect individual results visually, serve the repository and open
+`http://localhost:8000/tests/`.
+
+### Browser smoke test
 
 A service worker won't register from a `file://` path — serve over HTTP:
 

@@ -3,7 +3,7 @@
  * Bump CACHE_VERSION whenever you change index.html or any asset so clients
  * pick up the new files instead of serving stale ones.
  */
-const CACHE_VERSION = "aiml-deck-v13";
+const CACHE_VERSION = "aiml-deck-v16";
 const APP_SHELL = [
   "./",
   "./index.html",
