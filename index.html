@@ -61,6 +61,58 @@
   /* ---------- Header ---------- */
   header { margin-bottom: 36px; }
 
+  .account-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    min-height: 34px;
+    margin-bottom: 14px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .account-button {
+    padding: 7px 12px;
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    color: var(--light);
+    background: var(--ground-2);
+    font: 600 12px var(--font-mono);
+    cursor: pointer;
+  }
+  .account-button:hover { border-color: var(--teal); }
+  .account-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .auth-dialog {
+    width: min(440px, calc(100% - 32px));
+    padding: 0;
+    border: 1px solid var(--panel-line);
+    border-radius: var(--r);
+    color: var(--light);
+    background: var(--ground-2);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .45);
+  }
+  .auth-dialog::backdrop { background: rgba(5, 10, 18, .72); }
+  .auth-dialog-content { padding: 22px; }
+  .auth-dialog-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .auth-dialog h2 { margin: 0; font-size: 1.15rem; }
+  .auth-close { padding: 4px 8px; font-size: 18px; }
+  .auth-actions { display: grid; gap: 10px; margin-top: 18px; }
+  .auth-actions .session-button { width: 100%; }
+  .auth-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+  .auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--panel-line); }
+  .auth-email { display: grid; gap: 7px; color: var(--muted); font-size: 12px; }
+  .auth-email input {
+    width: 100%;
+    padding: 10px 11px;
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    color: var(--light);
+    background: var(--ground);
+    font: inherit;
+  }
+  .auth-message { min-height: 1.4em; margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+  .auth-message.error { color: #ffb4a8; }
+
   .eyebrow {
     font-family: var(--font-mono);
     font-size: 12px;
@@ -650,6 +702,8 @@
   }
 
   @media (max-width: 520px) {
+    .account-bar { justify-content: flex-start; flex-wrap: wrap; }
+    .auth-email + .session-button { margin-top: 10px; }
     .progress-heading-row { align-items: stretch; flex-direction: column; }
     .progress-heading-row .session-button { width: 100%; }
     .progress-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -670,11 +724,38 @@
 
 <div class="wrap">
   <header>
+    <div class="account-bar" aria-live="polite">
+      <span id="auth-status">Checking sign-in status…</span>
+      <button class="account-button" id="auth-open" type="button" hidden>Sign In</button>
+      <button class="account-button" id="auth-signout" type="button" hidden>Sign Out</button>
+    </div>
     <p class="eyebrow"><span class="sig">●</span> Machine Learning · Technical Interview Prep</p>
     <h1>Prepare for your next <em>AI/ML technical interview.</em></h1>
     <p class="lede">Practice curated questions across machine learning, probability, deep learning, Transformers, LLMs, and reinforcement learning.</p>
     <a class="start" href="#grid">Start Practicing <span aria-hidden="true">↓</span></a>
   </header>
+
+  <dialog class="auth-dialog" id="auth-dialog" aria-labelledby="auth-heading">
+    <div class="auth-dialog-content">
+      <div class="auth-dialog-top">
+        <h2 id="auth-heading">Sign in</h2>
+        <button class="account-button auth-close" id="auth-close" type="button" aria-label="Close sign-in dialog">×</button>
+      </div>
+      <p class="session-copy">Your current learning history stays in this browser. Cloud progress sync is not available yet.</p>
+      <div class="auth-actions">
+        <button class="session-button primary" id="auth-google" type="button">Continue with Google</button>
+        <div class="auth-divider">or</div>
+        <form id="auth-email-form">
+          <label class="auth-email" for="auth-email">
+            Email address
+            <input id="auth-email" name="email" type="email" autocomplete="email" required>
+          </label>
+          <button class="session-button" type="submit">Email me a sign-in link</button>
+        </form>
+      </div>
+      <p class="auth-message" id="auth-message" role="status"></p>
+    </div>
+  </dialog>
 
   <section class="session-panel" id="session-panel" aria-labelledby="session-heading">
     <div id="resume-prompt" class="resume-prompt" hidden>
@@ -763,6 +844,8 @@
   </div>
 </div>
 
+<script src="auth-config.js"></script>
+<script src="auth-service.js"></script>
 <script>
 /**
  * @typedef {"known" | "needs_review"} AssessmentResult
@@ -5739,10 +5822,124 @@ document.getElementById("practice-weak").addEventListener("click", startWeakSess
 progressPracticeWeak.addEventListener("click", startWeakSession);
 document.getElementById("return-to-deck").addEventListener("click", showDeck);
 
+const authStatus = document.getElementById("auth-status");
+const authOpen = document.getElementById("auth-open");
+const authSignOut = document.getElementById("auth-signout");
+const authDialog = document.getElementById("auth-dialog");
+const authMessage = document.getElementById("auth-message");
+const authGoogle = document.getElementById("auth-google");
+const authEmailForm = document.getElementById("auth-email-form");
+let authService = null;
+
+function authRedirectUrl() {
+  return `${window.location.origin}${window.location.pathname}`;
+}
+
+function renderAuthState(state) {
+  const identity = state?.identity || null;
+  const authenticated = Boolean(identity);
+  authOpen.hidden = authenticated || state?.status === AIMLAuth.AUTH_STATES.loading;
+  authSignOut.hidden = !authenticated;
+  if (state?.status === AIMLAuth.AUTH_STATES.loading) authStatus.textContent = "Checking sign-in status…";
+  else if (state?.status === AIMLAuth.AUTH_STATES.error) authStatus.textContent = authenticated
+    ? `${identity.email || "Signed in"} · connection issue`
+    : "Sign-in unavailable · local practice works";
+  else if (authenticated) authStatus.textContent = identity.email || "Signed in";
+  else authStatus.textContent = "Practice without an account";
+
+  if (state?.status === AIMLAuth.AUTH_STATES.error) {
+    authMessage.className = "auth-message error";
+    authMessage.textContent = "Sign-in is unavailable right now. Local practice and progress still work.";
+  }
+}
+
+function showAuthDialog() {
+  authMessage.className = "auth-message";
+  authMessage.textContent = "";
+  if (typeof authDialog.showModal === "function") authDialog.showModal();
+  else authDialog.setAttribute("open", "");
+}
+
+function closeAuthDialog() {
+  if (typeof authDialog.close === "function") authDialog.close();
+  else authDialog.removeAttribute("open");
+}
+
+async function initializeAuthentication() {
+  const config = window.AIML_AUTH_CONFIG;
+  if (!AIMLAuth.hasPublicAuthConfig(config)) {
+    renderAuthState({ status: AIMLAuth.AUTH_STATES.anonymous, identity: null, error: null });
+    return null;
+  }
+  try {
+    authService = await AIMLAuth.createConfiguredAuthService(config, { onChange: renderAuthState });
+    await authService.initialize();
+  } catch (error) {
+    console.warn("Authentication initialization failed; local study remains available.", error);
+    renderAuthState({ status: AIMLAuth.AUTH_STATES.error, identity: null, error });
+  }
+  return authService;
+}
+
+authOpen.addEventListener("click", showAuthDialog);
+document.getElementById("auth-close").addEventListener("click", closeAuthDialog);
+authDialog.addEventListener("click", event => {
+  if (event.target === authDialog) closeAuthDialog();
+});
+authGoogle.addEventListener("click", async () => {
+  if (!authService) {
+    authMessage.className = "auth-message error";
+    authMessage.textContent = "Sign-in is not configured yet. You can continue practicing without an account.";
+    return;
+  }
+  authGoogle.disabled = true;
+  authMessage.textContent = "Opening Google sign-in…";
+  try {
+    await authService.signInWithGoogle(authRedirectUrl());
+  } catch (_error) {
+    authMessage.className = "auth-message error";
+    authMessage.textContent = "Google sign-in could not be started. Please try again.";
+    authGoogle.disabled = false;
+  }
+});
+authEmailForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!authService) {
+    authMessage.className = "auth-message error";
+    authMessage.textContent = "Sign-in is not configured yet. You can continue practicing without an account.";
+    return;
+  }
+  const submit = authEmailForm.querySelector('button[type="submit"]');
+  submit.disabled = true;
+  authMessage.className = "auth-message";
+  authMessage.textContent = "Sending your sign-in link…";
+  try {
+    await authService.signInWithEmail(document.getElementById("auth-email").value.trim(), authRedirectUrl());
+    authMessage.textContent = "Check your email for a sign-in link. You can close this window and keep practicing.";
+  } catch (_error) {
+    authMessage.className = "auth-message error";
+    authMessage.textContent = "The sign-in link could not be sent. Check your connection and try again.";
+  } finally {
+    submit.disabled = false;
+  }
+});
+authSignOut.addEventListener("click", async () => {
+  if (!authService) return;
+  authSignOut.disabled = true;
+  try {
+    await authService.signOut();
+  } catch (_error) {
+    renderAuthState(authService.getState());
+  } finally {
+    authSignOut.disabled = false;
+  }
+});
+
 populateSessionTopics();
 render();
 if (session?.status === "completed") showSummary();
 else showDeck();
+initializeAuthentication();
 </script>
 
 <script>

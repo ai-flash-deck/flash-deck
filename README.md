@@ -2,7 +2,8 @@
 
 A self-contained Progressive Web App (PWA) of flip-card flashcards for highly technical
 AI/ML interviews — ML foundations, probability, deep learning, Transformers & LLMs, and RL.
-Equations render with native MathML; no build step, no dependencies.
+Equations render with native MathML and there is no build step. Optional
+authentication loads a pinned Supabase browser client only when configured.
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the current state model, persistence
 boundaries, known risks, and the recommended next iteration.
@@ -11,6 +12,8 @@ boundaries, known risks, and the recommended next iteration.
 
 ```
 index.html          The full app (deck + styles + logic)
+auth-service.js     Provider-neutral identity boundary and Supabase adapter
+auth-config.js      Browser-safe public authentication configuration
 ARCHITECTURE.md      Current architecture, boundaries, and migration plan
 manifest.json       PWA metadata (name, icons, colors)
 sw.js               Service worker — caches the app for offline use
@@ -87,7 +90,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
 
 The runner starts a temporary loopback-only static server and uses the installed
 Microsoft Edge JavaScript runtime. It does not install packages or access the
-internet. The 63 tests cover the 205 immutable question IDs, stable topic IDs,
+internet. The 73 tests cover the 205 immutable question IDs, stable topic IDs,
 canonical assessment semantics, reveal and duplicate guards, Quick and Full
 session selection, result calculation, multi-session assessment history, derived
 status and counters, reload persistence, legacy ID and storage-schema migration,
@@ -96,6 +99,9 @@ They also cover history-derived Weak Areas, recovery and regression, session-siz
 limits, empty state, active-session stability, and stable topic filtering.
 Overall and topic progress tests cover unique practiced questions, current-status
 changes, percentage rounding, invalid history, and session-result separation.
+Authentication tests use a fake provider to cover loading, anonymous,
+authenticated, error, restoration, sign-out, stable identity, and preservation of
+local learning data without network access.
 The test page loads the real `index.html`, so these checks execute the production
 functions and production card data.
 
@@ -110,3 +116,29 @@ A service worker won't register from a `file://` path — serve over HTTP:
 python -m http.server 8000
 # then open http://localhost:8000/
 ```
+
+## Optional authentication setup
+
+The deck continues to work without authentication. To enable Google and email
+magic-link sign-in, create a Supabase project and place its browser-safe project
+URL and publishable key (or legacy anon key) in `auth-config.js`. Never place a
+service-role key, database password, or Google client secret in frontend files.
+
+In Supabase Authentication:
+
+1. Set **Site URL** to the deployed Netlify origin.
+2. Add the exact production application URL and the local URL used for testing,
+   such as `http://localhost:8000/`, to **Redirect URLs**.
+3. Enable the Google provider. In Google Cloud, create an OAuth web client and
+   use the Supabase callback shown in the provider settings (normally
+   `https://<project-ref>.supabase.co/auth/v1/callback`) as an authorized redirect
+   URI, then enter the Google client ID and secret only in Supabase.
+4. Keep email auth enabled and configure production SMTP before public use.
+   Supabase's default email sender is intended only for limited project testing.
+
+The application requests magic links with the current page URL as the return
+location. Authentication creates an account identity only; learning history is
+still stored solely in the current browser and is not yet synchronized.
+Netlify needs no special callback function or rewrite while the application stays
+at the site root; its exact HTTPS site URL must simply be in Supabase's redirect
+allow list.

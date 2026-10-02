@@ -3,10 +3,12 @@
  * Bump CACHE_VERSION whenever you change index.html or any asset so clients
  * pick up the new files instead of serving stale ones.
  */
-const CACHE_VERSION = "aiml-deck-v18";
+const CACHE_VERSION = "aiml-deck-v19";
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./auth-config.js",
+  "./auth-service.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -36,6 +38,10 @@ self.addEventListener("activate", (event) => {
 // Cache-first; fall back to the network and cache new GET responses.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  // Authentication libraries and provider/API traffic stay on the network and
+  // are never inserted into the application shell cache.
+  if (new URL(event.request.url).origin !== self.location.origin) return;
 
   // Prefer the network for page navigations so returning visitors see the
   // latest deck immediately; fall back to the cached shell when offline.

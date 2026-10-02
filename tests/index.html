@@ -38,6 +38,7 @@
         startWeakSession, deriveOverallProgress, deriveTopicProgress,
         deriveProgressByTopic, renderProgress
       })`);
+      const authApi = app.AIMLAuth;
       const cards = api.CARDS;
       const ids = cards.map(api.cardId);
       const topic = api.TOPICS[0];
@@ -441,6 +442,89 @@
           api.progress.assessmentEvents.splice(0, api.progress.assessmentEvents.length, ...originalEvents);
           api.renderProgress();
         }
+      });
+      const fakeAuthClient = ({ session = null, getSessionError = null, signOutError = null } = {}) => {
+        let listener = null;
+        return {
+          client: { auth: {
+            getSession: async () => ({ data: { session }, error: getSessionError }),
+            onAuthStateChange: callback => {
+              listener = callback;
+              return { data: { subscription: { unsubscribe() {} } } };
+            },
+            signInWithOAuth: async payload => ({ data: payload, error: null }),
+            signInWithOtp: async payload => ({ data: payload, error: null }),
+            signOut: async () => ({ error: signOutError })
+          } },
+          emit(event, nextSession) { if (listener) listener(event, nextSession); }
+        };
+      };
+      test("T64: auth boundary begins in loading state", () => {
+        const service = authApi.createAuthService(fakeAuthClient().client);
+        equal(service.getState().status, "loading");
+      });
+      test("T65: missing provider session resolves to anonymous", async () => {
+        const service = authApi.createAuthService(fakeAuthClient().client);
+        await service.initialize();
+        equal([service.getState().status, service.getState().identity], ["anonymous", null]);
+      });
+      test("T66: restored session exposes only stable identity fields", async () => {
+        const fake = fakeAuthClient({ session: { user: { id: "user_123", email: "learner@example.com", user_metadata: { avatar_url: "ignored" } } } });
+        const service = authApi.createAuthService(fake.client);
+        await service.initialize();
+        equal(service.getState(), { status: "authenticated", identity: { userId: "user_123", email: "learner@example.com" }, error: null });
+      });
+      test("T67: provider auth change updates authenticated identity", async () => {
+        const fake = fakeAuthClient();
+        const service = authApi.createAuthService(fake.client);
+        await service.initialize();
+        fake.emit("SIGNED_IN", { user: { id: "user_456" } });
+        equal(service.getState(), { status: "authenticated", identity: { userId: "user_456" }, error: null });
+      });
+      test("T68: sign out uses local scope and returns anonymous", async () => {
+        let scope = null;
+        const fake = fakeAuthClient({ session: { user: { id: "user_123" } } });
+        fake.client.auth.signOut = async options => { scope = options.scope; return { error: null }; };
+        const service = authApi.createAuthService(fake.client);
+        await service.initialize();
+        await service.signOut();
+        equal([scope, service.getState().status, service.getState().identity], ["local", "anonymous", null]);
+      });
+      test("T69: restored-session failure becomes a safe error state", async () => {
+        const service = authApi.createAuthService(fakeAuthClient({ getSessionError: new Error("offline") }).client);
+        await service.initialize();
+        equal([service.getState().status, service.getState().identity], ["error", null]);
+      });
+      test("T70: failed sign out preserves the known identity", async () => {
+        const fake = fakeAuthClient({ session: { user: { id: "user_123" } }, signOutError: new Error("offline") });
+        const service = authApi.createAuthService(fake.client);
+        await service.initialize();
+        try { await service.signOut(); } catch (_error) {}
+        equal([service.getState().status, service.getState().identity.userId], ["error", "user_123"]);
+      });
+      test("T71: auth transitions do not alter local learning storage", async () => {
+        const before = app.localStorage.getItem(api.PROGRESS_KEY);
+        const fake = fakeAuthClient({ session: { user: { id: "user_123" } } });
+        const service = authApi.createAuthService(fake.client);
+        await service.initialize();
+        await service.signOut();
+        equal(app.localStorage.getItem(api.PROGRESS_KEY), before);
+      });
+      test("T72: derived progress survives auth transitions", async () => {
+        const events = [eventRecord(ids[0], "known"), eventRecord(ids[1], "needs_review")];
+        const before = api.deriveOverallProgress(cards, events);
+        const fake = fakeAuthClient({ session: { user: { id: "user_123" } } });
+        const service = authApi.createAuthService(fake.client);
+        await service.initialize();
+        await service.signOut();
+        equal(api.deriveOverallProgress(cards, events), before);
+      });
+      test("T73: Google and email flows pass provider-neutral redirect inputs", async () => {
+        const service = authApi.createAuthService(fakeAuthClient().client);
+        const google = await service.signInWithGoogle("https://example.test/");
+        const email = await service.signInWithEmail("learner@example.com", "https://example.test/");
+        equal(google.data, { provider: "google", options: { redirectTo: "https://example.test/" } });
+        equal(email.data, { email: "learner@example.com", options: { emailRedirectTo: "https://example.test/" } });
       });
 
       let passed = 0;

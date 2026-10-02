@@ -2,8 +2,10 @@
 
 ## Current application
 
-The deck is a dependency-free Progressive Web App. There is no framework, router,
-package manager, build step, or third-party test runner. `index.html` contains the
+The deck is a static Progressive Web App. There is no framework, router, package
+manager, build step, or third-party test runner. When optional authentication is
+configured, the browser loads the pinned Supabase JavaScript client at runtime.
+`index.html` contains the
 HTML, CSS, question content, UI rendering, study-session logic, and browser
 persistence integration. `sw.js` provides offline caching, while `manifest.json`
 and `icons/` provide installable-PWA metadata and assets.
@@ -24,8 +26,8 @@ responsibilities are kept in recognizable sections:
   calculation helpers.
 - **Progress:** durable events in `progress.assessmentEvents`, derived question
   progress, and active-session response snapshots in `session.responses`.
-- **Identity:** represented only by the nullable `userId` field. Authentication is
-  intentionally absent.
+- **Identity:** `auth-service.js` exposes provider-neutral auth state and the
+  minimum authenticated identity; Supabase-specific calls remain behind it.
 - **Persistence:** `storageRepository`, plus progress/session validation and schema
   version checks.
 - **UI:** DOM references, card rendering, view transitions, and event handlers.
@@ -129,6 +131,55 @@ Session results remain separate: `calculateSessionResults` describes only the
 responses stored in one `StudySession`, while overall and topic progress describe
 the latest status across durable `progress.assessmentEvents`.
 
+### Optional authentication
+
+Supabase Auth is the managed identity provider. It is compatible with this static
+application through its browser client, supports Google OAuth and passwordless
+email, restores its own browser session, and requires no custom authentication
+backend. `auth-service.js` loads the pinned Supabase UMD client only when valid
+public configuration exists, so missing configuration or network access never
+prevents the local deck from loading.
+
+The `authService` boundary has four states: `loading`, `anonymous`,
+`authenticated`, and `error`. Provider user objects are reduced to the identity
+contract `{ userId, email? }`. Study, card, Weak Areas, and progress functions do
+not receive the Supabase client or provider user. `onAuthStateChange` updates the
+identity after redirect completion, token restoration, refresh, and sign-out.
+Sign-out uses local scope and does not clear application learning storage.
+
+Google uses Supabase's redirect OAuth flow. Email uses Supabase-managed magic
+links via `signInWithOtp`; no application password handling or credential storage
+is introduced. Both return to the current origin and pathname. That exact URL
+must be allowed in Supabase Authentication URL Configuration for production and
+local development. Google Cloud redirects to Supabase's provider callback, while
+the application return URL is configured in Supabase. A production email flow
+also requires a suitable SMTP provider; Supabase's default sender is limited and
+intended for testing.
+
+`auth-config.js` contains only the project URL and browser-safe publishable (or
+legacy anon) key. Service-role keys, database credentials, and Google client
+secrets must never be committed or sent to the browser. The Google secret belongs
+in Supabase provider settings. The service worker caches the local auth service
+and configuration files, but does not cache Supabase requests, responses, or
+tokens. Supabase manages its own auth-session storage.
+
+Authentication is optional and does not gate any study behavior. An auth error is
+shown only in the account surface; local progress, active sessions, and offline
+study continue. Learning persistence remains schema 4/domain migration 3, and
+`progress.assessmentEvents` remains the sole durable learning source. Signing in
+or out does not add a user ID to events, migrate them, delete them, or claim that
+they are synchronized.
+
+#### Iteration 7 local-to-remote contract
+
+Future remote learning records will belong to the authenticated `userId` and use
+the existing assessment event shape and IDs. The synchronization step must merge
+eligible anonymous local history after authentication, preserve event IDs for
+duplicate-safe idempotency, and retain local history until remote persistence is
+confirmed. Authentication alone must never delete or reassign local history.
+Malformed and unmapped local data must remain recoverable and excluded safely.
+No remote learning tables or synchronization behavior exist in this iteration.
+
 ### Legacy question-ID migration
 
 Persistence schema version 1 used hashes derived from category and question text.
@@ -173,10 +224,14 @@ starts with its answer hidden; reveal state is not persisted.
 - Only one active/completed session record is retained locally. Assessment events
   survive across sessions, but session-history metadata and analytics remain out
   of scope.
+- Live Google and email authentication require external Supabase, Google OAuth,
+  redirect URL, and SMTP configuration. Fake-provider tests verify the code
+  boundary, but cannot prove that project-owned external settings are correct.
 
 ## Recommended next structural step
 
-Before introducing remote persistence, define how locally generated event IDs and
-conflicting offline histories merge across devices. Authentication should remain
-above the persistence boundary so `makeCard` remains unaware of the provider.
+Iteration 7 should add a remote assessment-event repository keyed by authenticated
+`userId`, then implement an idempotent local-to-remote merge using the existing
+event IDs. Resolve same-ID conflicts explicitly, confirm remote writes before any
+local cleanup, and keep `makeCard` and progress derivation provider-independent.
 
