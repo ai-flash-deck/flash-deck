@@ -34,7 +34,9 @@
         migrateSessionRecord, loadProgress, loadSession, createSessionState,
         calculateSessionResults, canonicalAssessmentResult, createAssessmentEvent,
         assessQuestionPresentation, makeCard, progress, assessmentHistoryRepository,
-        deriveQuestionProgress, isValidAssessmentEvent
+        deriveQuestionProgress, isValidAssessmentEvent, getWeakQuestions,
+        startWeakSession, deriveOverallProgress, deriveTopicProgress,
+        deriveProgressByTopic, renderProgress
       })`);
       const cards = api.CARDS;
       const ids = cards.map(api.cardId);
@@ -272,6 +274,172 @@
           assert(card.querySelector(".assessment-status").textContent.includes("could not be saved"));
         } finally {
           api.assessmentHistoryRepository.append = originalAppend;
+        }
+      });
+      test("T43: basic weak set includes only current needs-review questions", () => {
+        const events = [
+          eventRecord(ids[0], "needs_review"),
+          eventRecord(ids[1], "known"),
+          eventRecord(ids[2], "needs_review")
+        ];
+        equal(api.getWeakQuestions(cards, events).map(api.cardId), [ids[0], ids[2]]);
+      });
+      test("T44: recovery removes a question from the weak set", () => {
+        const events = [
+          eventRecord(ids[0], "needs_review", "session_a", "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[0], "known", "session_b", "2026-01-02T00:00:00.000Z")
+        ];
+        equal(api.getWeakQuestions(cards, events).map(api.cardId), []);
+      });
+      test("T45: regression adds a question to the weak set", () => {
+        const events = [
+          eventRecord(ids[1], "known", "session_a", "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[1], "needs_review", "session_b", "2026-01-02T00:00:00.000Z")
+        ];
+        equal(api.getWeakQuestions(cards, events).map(api.cardId), [ids[1]]);
+      });
+      test("T46: multiple history uses only each latest valid assessment", () => {
+        const events = [
+          eventRecord(ids[0], "needs_review", null, "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[0], "needs_review", null, "2026-01-02T00:00:00.000Z"),
+          eventRecord(ids[0], "known", null, "2026-01-03T00:00:00.000Z"),
+          eventRecord(ids[1], "known", null, "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[1], "needs_review", null, "2026-01-02T00:00:00.000Z"),
+          eventRecord(ids[2], "needs_review", null, "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[2], "known", null, "2026-01-02T00:00:00.000Z"),
+          eventRecord(ids[2], "needs_review", null, "2026-01-03T00:00:00.000Z")
+        ];
+        equal(api.getWeakQuestions(cards, events).map(api.cardId), [ids[1], ids[2]]);
+      });
+      test("T47: unassessed questions are not weak", () => equal(api.getWeakQuestions(cards.slice(0, 4), []).map(api.cardId), []));
+      test("T48: a short weak pool uses all available questions without filler", () => {
+        const selected = ids.slice(0, 12);
+        const events = selected.map(id => eventRecord(id, "needs_review"));
+        const weakIds = api.getWeakQuestions(cards, events).map(api.cardId);
+        const weakSession = api.createSessionState({ sessionType: "weak", requestedLength: 15, topicId: "weak_areas", eligibleIds: weakIds });
+        equal([weakSession.cardIds.length, new Set(weakSession.cardIds).size], [12, 12]);
+        assert(weakSession.cardIds.every(id => selected.includes(id)));
+      });
+      test("T49: empty weak history produces no session and shows the empty state", () => {
+        const originalEvents = [...api.progress.assessmentEvents];
+        api.progress.assessmentEvents.splice(0);
+        try {
+          equal(api.startWeakSession(), false);
+          equal(app.document.getElementById("weak-empty").hidden, false);
+        } finally {
+          api.progress.assessmentEvents.splice(0, api.progress.assessmentEvents.length, ...originalEvents);
+        }
+      });
+      test("T50: active weak-session card order remains stable after recovery", () => {
+        const weakIds = ids.slice(0, 3);
+        const initial = weakIds.map(id => eventRecord(id, "needs_review", "session_a", "2026-01-01T00:00:00.000Z"));
+        const activeSession = api.createSessionState({ sessionType: "weak", requestedLength: 3, topicId: "weak_areas", eligibleIds: api.getWeakQuestions(cards, initial).map(api.cardId), preserveOrder: true });
+        const originalOrder = [...activeSession.cardIds];
+        const recovered = [...initial, eventRecord(ids[0], "known", activeSession.sessionId, "2026-01-02T00:00:00.000Z")];
+        equal(activeSession.cardIds, originalOrder);
+        equal(api.getWeakQuestions(cards, recovered).map(api.cardId), weakIds.slice(1));
+      });
+      test("T51: weak set combines needs-review events across sessions", () => {
+        const events = [
+          eventRecord(ids[0], "needs_review", "session_1"),
+          eventRecord(ids[1], "needs_review", "session_2"),
+          eventRecord(ids[2], "known", "session_3")
+        ];
+        equal(api.getWeakQuestions(cards, events).map(api.cardId), ids.slice(0, 2));
+      });
+      test("T52: optional weak filtering uses stable topic IDs", () => {
+        const mlCard = cards.find(card => card.topicId === "ml_foundations");
+        const rlCard = cards.find(card => card.topicId === "reinforcement_learning");
+        const events = [eventRecord(mlCard.id, "needs_review"), eventRecord(rlCard.id, "needs_review")];
+        equal(api.getWeakQuestions(cards, events).map(api.cardId), [mlCard.id, rlCard.id]);
+        equal(api.getWeakQuestions(cards, events, "ml_foundations").map(api.cardId), [mlCard.id]);
+      });
+      test("T53: a large weak pool respects the requested size without duplicates or filler", () => {
+        const eligible = ids.slice(0, 20);
+        const events = eligible.map(id => eventRecord(id, "needs_review"));
+        const weakIds = api.getWeakQuestions(cards, events).map(api.cardId);
+        const weakSession = api.createSessionState({ sessionType: "weak", requestedLength: 15, topicId: "weak_areas", eligibleIds: weakIds });
+        equal([weakSession.cardIds.length, new Set(weakSession.cardIds).size], [15, 15]);
+        assert(weakSession.cardIds.every(id => eligible.includes(id)));
+      });
+      test("T54: zero progress counts all cards without showing a percentage error", () => {
+        equal(api.deriveOverallProgress(cards, []), { totalQuestions: 205, questionsPracticed: 0, known: 0, needsReview: 0, knownPercent: 0 });
+      });
+      test("T55: basic overall progress counts current unique statuses", () => {
+        const events = [eventRecord(ids[0], "known"), eventRecord(ids[1], "needs_review"), eventRecord(ids[2], "known")];
+        const summary = api.deriveOverallProgress(cards, events);
+        equal([summary.questionsPracticed, summary.known, summary.needsReview, summary.knownPercent], [3, 2, 1, 67]);
+      });
+      test("T56: repeated assessments do not inflate practiced questions", () => {
+        const events = [
+          eventRecord(ids[0], "needs_review", null, "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[0], "needs_review", null, "2026-01-02T00:00:00.000Z"),
+          eventRecord(ids[0], "known", null, "2026-01-03T00:00:00.000Z"),
+          eventRecord(ids[1], "known", null, "2026-01-01T00:00:00.000Z")
+        ];
+        const summary = api.deriveOverallProgress(cards, events);
+        equal([summary.questionsPracticed, summary.known, summary.needsReview], [2, 2, 0]);
+      });
+      test("T57: recovery updates overall status without changing practiced count", () => {
+        const initial = [eventRecord(ids[0], "needs_review", null, "2026-01-01T00:00:00.000Z"), eventRecord(ids[1], "known", null, "2026-01-01T00:00:00.000Z")];
+        const recovered = [...initial, eventRecord(ids[0], "known", null, "2026-01-02T00:00:00.000Z")];
+        const before = api.deriveOverallProgress(cards, initial);
+        const after = api.deriveOverallProgress(cards, recovered);
+        equal([before.questionsPracticed, before.known, before.needsReview, after.questionsPracticed, after.known, after.needsReview], [2, 1, 1, 2, 2, 0]);
+      });
+      test("T58: regression updates overall status without changing practiced count", () => {
+        const initial = [eventRecord(ids[0], "known", null, "2026-01-01T00:00:00.000Z"), eventRecord(ids[1], "known", null, "2026-01-01T00:00:00.000Z")];
+        const regressed = [...initial, eventRecord(ids[1], "needs_review", null, "2026-01-02T00:00:00.000Z")];
+        const summary = api.deriveOverallProgress(cards, regressed);
+        equal([summary.questionsPracticed, summary.known, summary.needsReview, summary.knownPercent], [2, 1, 1, 50]);
+      });
+      test("T59: topic progress uses stable IDs without cross-topic leakage", () => {
+        const mlCards = cards.filter(card => card.topicId === "ml_foundations");
+        const rlCards = cards.filter(card => card.topicId === "reinforcement_learning");
+        const events = [eventRecord(mlCards[0].id, "known"), eventRecord(mlCards[1].id, "needs_review"), eventRecord(rlCards[0].id, "known")];
+        const ml = api.deriveTopicProgress(cards, events, "ml_foundations");
+        const rl = api.deriveTopicProgress(cards, events, "reinforcement_learning");
+        equal([ml.topicId, ml.totalQuestions, ml.questionsPracticed, ml.known, ml.needsReview], ["ml_foundations", mlCards.length, 2, 1, 1]);
+        equal([rl.topicId, rl.totalQuestions, rl.questionsPracticed, rl.known, rl.needsReview], ["reinforcement_learning", rlCards.length, 1, 1, 0]);
+      });
+      test("T60: unassessed topic questions count only toward the topic total", () => {
+        const topicCards = cards.filter(card => card.topicId === topic.id);
+        const summary = api.deriveTopicProgress(cards, [eventRecord(topicCards[0].id, "known")], topic.id);
+        equal([summary.totalQuestions, summary.questionsPracticed, summary.known, summary.needsReview], [topicCards.length, 1, 1, 0]);
+      });
+      test("T61: invalid and unknown history cannot inflate progress", () => {
+        const valid = eventRecord(ids[0], "known");
+        const history = [valid, null, { id: "unknown", questionId: "q_unknown", result: "known", assessedAt: stamp }, { id: "malformed" }];
+        const summary = api.deriveOverallProgress(cards, history);
+        equal([summary.questionsPracticed, summary.known, summary.needsReview], [1, 1, 0]);
+      });
+      test("T62: session results remain separate from cross-session overall progress", () => {
+        const history = [
+          eventRecord(ids[0], "needs_review", "old", "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[0], "known", "current", "2026-01-02T00:00:00.000Z"),
+          eventRecord(ids[1], "known", "current", "2026-01-02T00:01:00.000Z"),
+          eventRecord(ids[2], "needs_review", "old", "2026-01-01T00:02:00.000Z")
+        ];
+        const currentResponses = { [ids[0]]: history[1], [ids[1]]: history[2] };
+        const sessionResult = api.calculateSessionResults({ cardIds: ids.slice(0, 2), responses: currentResponses });
+        const overall = api.deriveOverallProgress(cards, history);
+        equal([sessionResult.total, sessionResult.counts.known, sessionResult.counts.needs_review], [2, 2, 0]);
+        equal([overall.questionsPracticed, overall.known, overall.needsReview], [3, 2, 1]);
+      });
+      test("T63: rendered progress updates immediately from current history", () => {
+        const originalEvents = [...api.progress.assessmentEvents];
+        api.progress.assessmentEvents.splice(0, api.progress.assessmentEvents.length,
+          eventRecord(ids[0], "needs_review", null, "2026-01-01T00:00:00.000Z"),
+          eventRecord(ids[1], "known", null, "2026-01-01T00:01:00.000Z"));
+        try {
+          api.renderProgress();
+          equal([app.document.getElementById("progress-practiced").textContent, app.document.getElementById("progress-known").textContent, app.document.getElementById("progress-review").textContent, app.document.getElementById("progress-percent").textContent], ["2 / 205", "1", "1", "50%"]);
+          api.progress.assessmentEvents.push(eventRecord(ids[0], "known", null, "2026-01-02T00:00:00.000Z"));
+          api.renderProgress();
+          equal([app.document.getElementById("progress-known").textContent, app.document.getElementById("progress-review").textContent, app.document.getElementById("progress-percent").textContent], ["2", "0", "100%"]);
+        } finally {
+          api.progress.assessmentEvents.splice(0, api.progress.assessmentEvents.length, ...originalEvents);
+          api.renderProgress();
         }
       });
 

@@ -87,11 +87,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
 
 The runner starts a temporary loopback-only static server and uses the installed
 Microsoft Edge JavaScript runtime. It does not install packages or access the
-internet. The 42 tests cover the 205 immutable question IDs, stable topic IDs,
+internet. The 63 tests cover the 205 immutable question IDs, stable topic IDs,
 canonical assessment semantics, reveal and duplicate guards, Quick and Full
 session selection, result calculation, multi-session assessment history, derived
 status and counters, reload persistence, legacy ID and storage-schema migration,
 migration idempotency, unknown IDs, and malformed or corrupted browser storage.
+They also cover history-derived Weak Areas, recovery and regression, session-size
+limits, empty state, active-session stability, and stable topic filtering.
+Overall and topic progress tests cover unique practiced questions, current-status
+changes, percentage rounding, invalid history, and session-result separation.
 The test page loads the real `index.html`, so these checks execute the production
 functions and production card data.
 

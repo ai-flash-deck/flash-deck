@@ -166,6 +166,47 @@
   }
   .count b { color: var(--amber); }
 
+  /* ---------- Learning progress ---------- */
+  .progress-panel {
+    margin: 26px 0 18px;
+    padding: 16px 18px;
+    border: 1px solid var(--panel-line);
+    border-radius: var(--r);
+    background: rgba(15, 26, 44, 0.55);
+  }
+  .progress-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .progress-panel h2 { margin: 0; color: var(--light); font-size: 1rem; }
+  .progress-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .progress-metric {
+    padding: 10px;
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+  }
+  .progress-metric b { display: block; color: var(--light); font-size: 1.15rem; }
+  .progress-metric span { color: var(--muted); font: 11px var(--font-mono); }
+  .topic-progress { display: grid; gap: 6px; margin-top: 10px; }
+  .topic-progress-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 7px;
+    border-top: 1px solid var(--panel-line);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .topic-progress-row b { color: var(--light); font-weight: 600; }
+  .topic-progress-row span:last-child { text-align: right; }
+
   /* ---------- Study sessions ---------- */
   .session-panel {
     margin: 30px 0 26px;
@@ -609,9 +650,15 @@
   }
 
   @media (max-width: 520px) {
+    .progress-heading-row { align-items: stretch; flex-direction: column; }
+    .progress-heading-row .session-button { width: 100%; }
+    .progress-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .topic-progress-row { display: grid; gap: 3px; }
+    .topic-progress-row span:last-child { text-align: left; }
     .session-panel { padding: 15px; }
     .session-setup-row, .topic-select-label, .session-actions { width: 100%; }
-    .session-actions .session-button { flex: 1; }
+    .session-actions { flex-direction: column; }
+    .session-actions .session-button { flex: none; width: 100%; white-space: normal; }
     .summary-results { grid-template-columns: 1fr; }
     .summary-result { display: flex; align-items: center; justify-content: space-between; text-align: left; }
     .summary-result b { display: inline; }
@@ -679,6 +726,7 @@
     <p class="summary-total" id="summary-total"></p>
     <div class="summary-results" id="summary-results"></div>
     <p class="summary-confidence" id="summary-confidence"></p>
+    <p class="session-copy" id="weak-empty" role="status" hidden>You don't have any questions that need review right now.</p>
     <div class="session-actions">
       <button class="session-button primary" id="practice-again" type="button">Practice Again</button>
       <button class="session-button" id="practice-weak" type="button">Practice Weak Areas</button>
@@ -687,6 +735,20 @@
   </section>
 
   <div id="browse-view">
+  <section class="progress-panel" aria-labelledby="progress-heading">
+    <div class="progress-heading-row">
+      <h2 id="progress-heading">Your progress</h2>
+      <button class="session-button" id="progress-practice-weak" type="button" hidden>Practice Weak Areas</button>
+    </div>
+    <p class="session-copy" id="progress-empty">Start practicing to build your progress.</p>
+    <div class="progress-metrics" id="progress-metrics" hidden>
+      <div class="progress-metric"><b id="progress-practiced"></b><span>Practiced</span></div>
+      <div class="progress-metric"><b id="progress-known"></b><span>Known</span></div>
+      <div class="progress-metric"><b id="progress-review"></b><span>Needs Review</span></div>
+      <div class="progress-metric"><b id="progress-percent"></b><span>Known %</span></div>
+    </div>
+    <div class="topic-progress" id="topic-progress" aria-label="Progress by topic" hidden></div>
+  </section>
   <div class="toolbar" aria-labelledby="topic-label">
     <p class="topic-label" id="topic-label">Choose a topic</p>
     <div class="chips" id="chips" aria-label="Interview topics"></div>
@@ -5178,6 +5240,51 @@ function deriveQuestionProgress(events, questionId) {
   };
 }
 
+function getWeakQuestions(cards, assessmentEvents, topicId = null) {
+  const content = Array.isArray(cards) ? cards : [];
+  return content.filter(card =>
+    (!topicId || card.topicId === topicId) &&
+    deriveQuestionProgress(assessmentEvents, card.id).currentStatus === ASSESSMENT_RESULTS.needsReview
+  );
+}
+
+function deriveOverallProgress(cards, assessmentEvents) {
+  const seen = new Set();
+  const validCards = (Array.isArray(cards) ? cards : []).filter(card => {
+    if (!card || !cardsById.has(card.id) || seen.has(card.id)) return false;
+    seen.add(card.id);
+    return true;
+  });
+  let known = 0;
+  let needsReview = 0;
+  validCards.forEach(card => {
+    const status = deriveQuestionProgress(assessmentEvents, card.id).currentStatus;
+    if (status === ASSESSMENT_RESULTS.known) known++;
+    if (status === ASSESSMENT_RESULTS.needsReview) needsReview++;
+  });
+  const questionsPracticed = known + needsReview;
+  return {
+    totalQuestions: validCards.length,
+    questionsPracticed,
+    known,
+    needsReview,
+    knownPercent: questionsPracticed ? Math.round((known / questionsPracticed) * 100) : 0
+  };
+}
+
+function deriveTopicProgress(cards, assessmentEvents, topicId) {
+  const topic = topicsById.get(topicId);
+  const summary = deriveOverallProgress(
+    (Array.isArray(cards) ? cards : []).filter(card => card?.topicId === topicId),
+    assessmentEvents
+  );
+  return { topicId, topicName: topic?.name || "", ...summary };
+}
+
+function deriveProgressByTopic(cards, assessmentEvents) {
+  return TOPICS.map(topic => deriveTopicProgress(cards, assessmentEvents, topic.id));
+}
+
 function cardId(c) {
   return c.id;
 }
@@ -5200,6 +5307,10 @@ const sessionHint = document.getElementById("session-hint");
 const nextQuestion = document.getElementById("next-question");
 const sessionSummary = document.getElementById("session-summary");
 const browseView = document.getElementById("browse-view");
+const progressEmpty = document.getElementById("progress-empty");
+const progressMetrics = document.getElementById("progress-metrics");
+const topicProgress = document.getElementById("topic-progress");
+const progressPracticeWeak = document.getElementById("progress-practice-weak");
 
 function availableTopics() {
   return TOPICS.filter(topic => CARDS.some(card => card.topicId === topic.id));
@@ -5314,11 +5425,39 @@ function refreshSessionLauncher() {
   }
 }
 
+function renderProgress() {
+  const overall = deriveOverallProgress(CARDS, progress.assessmentEvents);
+  const hasProgress = overall.questionsPracticed > 0;
+  progressEmpty.hidden = hasProgress;
+  progressMetrics.hidden = !hasProgress;
+  topicProgress.hidden = !hasProgress;
+  progressPracticeWeak.hidden = overall.needsReview === 0 || session?.status === "active";
+  if (!hasProgress) {
+    topicProgress.innerHTML = "";
+    return overall;
+  }
+
+  document.getElementById("progress-practiced").textContent = `${overall.questionsPracticed} / ${overall.totalQuestions}`;
+  document.getElementById("progress-known").textContent = overall.known;
+  document.getElementById("progress-review").textContent = overall.needsReview;
+  document.getElementById("progress-percent").textContent = `${overall.knownPercent}%`;
+  topicProgress.innerHTML = deriveProgressByTopic(CARDS, progress.assessmentEvents)
+    .filter(topic => topic.questionsPracticed > 0)
+    .map(topic => `
+      <div class="topic-progress-row">
+        <b>${topic.topicName}</b>
+        <span>${topic.questionsPracticed} / ${topic.totalQuestions} Practiced · ${topic.known} Known · ${topic.needsReview} Needs Review · ${topic.knownPercent}% Known</span>
+      </div>`)
+    .join("");
+  return overall;
+}
+
 function showDeck() {
   sessionView.hidden = true;
   sessionSummary.hidden = true;
   sessionPanel.hidden = false;
   browseView.hidden = false;
+  renderProgress();
   refreshSessionLauncher();
 }
 
@@ -5392,7 +5531,8 @@ function calculateSessionResults(sessionState = {}) {
 
 function showSummary() {
   if (!session || session.status !== "completed") return showDeck();
-  const { counts, total, confidence, weakCardIds } = calculateSessionResults(session);
+  const { counts, total, confidence } = calculateSessionResults(session);
+  const weakQuestions = getWeakQuestions(CARDS, progress.assessmentEvents);
   sessionPanel.hidden = true;
   browseView.hidden = true;
   sessionView.hidden = true;
@@ -5402,21 +5542,26 @@ function showSummary() {
     <div class="summary-result"><b>${counts.known}</b><span>Knew It</span></div>
     <div class="summary-result"><b>${counts.needs_review}</b><span>Didn't Know</span></div>`;
   document.getElementById("summary-confidence").textContent = `${confidence}% confidently answered`;
-  document.getElementById("practice-weak").hidden = weakCardIds.length === 0;
+  document.getElementById("practice-weak").hidden = weakQuestions.length === 0;
+  document.getElementById("weak-empty").hidden = weakQuestions.length !== 0;
   window.scrollTo({ top: sessionSummary.offsetTop - 20, behavior: "smooth" });
 }
 
 function startWeakSession() {
-  const { weakCardIds } = calculateSessionResults(session);
-  const weakIds = shuffle(weakCardIds);
-  if (!weakIds.length) return;
+  const weakQuestions = getWeakQuestions(CARDS, progress.assessmentEvents);
+  if (!weakQuestions.length) {
+    document.getElementById("practice-weak").hidden = true;
+    document.getElementById("weak-empty").hidden = false;
+    return false;
+  }
+  const requestedLength = Math.min(session?.requestedLength || SESSION_TYPES.quick.length, weakQuestions.length);
   beginSession({
     sessionType: "weak",
-    requestedLength: weakIds.length,
+    requestedLength,
     topicId: "weak_areas",
-    poolIds: weakIds,
-    preserveOrder: true
+    poolIds: weakQuestions.map(cardId)
   });
+  return true;
 }
 
 function populateSessionTopics() {
@@ -5530,6 +5675,7 @@ function makeCard(c, options = {}) {
         button.setAttribute("aria-pressed", button === option);
       });
       if (typeof options.onAssess === "function") options.onAssess(assessment.event);
+      renderProgress();
       card.querySelector(".assessment-status").textContent = `${option.textContent} saved.`;
     });
   });
@@ -5590,6 +5736,7 @@ document.getElementById("practice-again").addEventListener("click", () => {
 });
 
 document.getElementById("practice-weak").addEventListener("click", startWeakSession);
+progressPracticeWeak.addEventListener("click", startWeakSession);
 document.getElementById("return-to-deck").addEventListener("click", showDeck);
 
 populateSessionTopics();

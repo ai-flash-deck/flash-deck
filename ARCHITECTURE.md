@@ -81,6 +81,54 @@ the same choice for the same question presentation and session returns the prior
 event instead of creating a duplicate. A changed choice appends a new event, and
 the later event becomes current status.
 
+### Weak Areas
+
+Weak Areas has no separate persisted status or question list. `getWeakQuestions`
+receives the content cards and `progress.assessmentEvents`, calls
+`deriveQuestionProgress` for each candidate, and includes only questions whose
+current status is `needs_review`. Questions with a newer `known` event and
+unassessed questions are excluded.
+
+The selector accepts an optional stable `topicId`; display names are never used
+for weak eligibility. Starting weak practice passes the selected IDs into the
+normal `createSessionState` and navigation flow. The completed session's requested
+size is the cap, while a smaller eligible pool is used in full without duplicates
+or filler.
+
+An active weak session stores its ordered `cardIds` like every other session.
+Assessments may change future eligibility, but they never mutate that active
+snapshot, preserving navigation, resume, and session-specific results. When the
+derived pool is empty, the completion screen shows a simple no-review message and
+retains the existing Practice Again and Return to Deck actions.
+
+### Overall and topic progress
+
+`deriveOverallProgress(cards, assessmentEvents)` provides the read-only lifetime
+summary. It counts valid unique content cards, derives each card's current status
+with `deriveQuestionProgress`, and returns:
+
+- `totalQuestions`: all valid cards in the supplied content set.
+- `questionsPracticed`: unique questions with a current canonical status.
+- `known`: practiced questions currently `known`.
+- `needsReview`: practiced questions currently `needs_review`.
+- `knownPercent`: `Math.round(known / questionsPracticed * 100)`, or `0` when no
+  questions have been practiced.
+
+Therefore `known + needsReview === questionsPracticed`. Historical attempts do
+not increase the practiced count, and unassessed questions count only toward the
+total. Invalid and unknown events are already excluded by the shared question
+progress validation.
+
+`deriveTopicProgress` applies the same rules after filtering cards by stable
+`topicId`; `deriveProgressByTopic` returns summaries in authoritative `TOPICS`
+order with their display names. No summary, percentage, or topic counter is
+persisted. The compact deck view hides numeric metrics for a new user and shows
+the neutral prompt to start practicing instead.
+
+Session results remain separate: `calculateSessionResults` describes only the
+responses stored in one `StudySession`, while overall and topic progress describe
+the latest status across durable `progress.assessmentEvents`.
+
 ### Legacy question-ID migration
 
 Persistence schema version 1 used hashes derived from category and question text.
@@ -125,8 +173,6 @@ starts with its answer hidden; reveal state is not persisted.
 - Only one active/completed session record is retained locally. Assessment events
   survive across sessions, but session-history metadata and analytics remain out
   of scope.
-- Weak-area practice uses the most recently completed session rather than a full
-  cross-session history.
 
 ## Recommended next structural step
 
