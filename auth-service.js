@@ -72,10 +72,22 @@
       }
     }
 
-    async function signInWithEmail(email, redirectTo) {
+    async function signInWithPassword(email, password) {
       try {
-        const result = await client.auth.signInWithOtp({
+        const result = await client.auth.signInWithPassword({ email, password });
+        if (result && result.error) throw result.error;
+        return result;
+      } catch (error) {
+        publishError(error);
+        throw error;
+      }
+    }
+
+    async function signUpWithPassword(email, password, redirectTo) {
+      try {
+        const result = await client.auth.signUp({
           email,
+          password,
           options: { emailRedirectTo: redirectTo }
         });
         if (result && result.error) throw result.error;
@@ -100,7 +112,8 @@
     return Object.freeze({
       initialize,
       signInWithGoogle,
-      signInWithEmail,
+      signInWithPassword,
+      signUpWithPassword,
       signOut,
       getState: () => state,
       subscribe(listener) {

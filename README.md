@@ -90,7 +90,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
 
 The runner starts a temporary loopback-only static server and uses the installed
 Microsoft Edge JavaScript runtime. It does not install packages or access the
-internet. The 73 tests cover the 205 immutable question IDs, stable topic IDs,
+internet. The 74 tests cover the 205 immutable question IDs, stable topic IDs,
 canonical assessment semantics, reveal and duplicate guards, Quick and Full
 session selection, result calculation, multi-session assessment history, derived
 status and counters, reload persistence, legacy ID and storage-schema migration,
@@ -119,8 +119,8 @@ python -m http.server 8000
 
 ## Optional authentication setup
 
-The deck continues to work without authentication. To enable Google and email
-magic-link sign-in, create a Supabase project and place its browser-safe project
+The deck continues to work without authentication. To enable Google and email/
+password sign-in, create a Supabase project and place its browser-safe project
 URL and publishable key (or legacy anon key) in `auth-config.js`. Never place a
 service-role key, database password, or Google client secret in frontend files.
 
@@ -133,11 +133,11 @@ In Supabase Authentication:
    use the Supabase callback shown in the provider settings (normally
    `https://<project-ref>.supabase.co/auth/v1/callback`) as an authorized redirect
    URI, then enter the Google client ID and secret only in Supabase.
-4. Keep email auth enabled and configure production SMTP before public use.
-   Supabase's default email sender is intended only for limited project testing.
+4. Keep email/password auth and email confirmation enabled. Configure production
+   SMTP before public use; Supabase's default sender is only for limited testing.
 
-The application requests magic links with the current page URL as the return
-location. Authentication creates an account identity only; learning history is
+New accounts use the current page URL after email confirmation. Authentication
+creates an account identity only; learning history is
 still stored solely in the current browser and is not yet synchronized.
 Netlify needs no special callback function or rewrite while the application stays
 at the site root; its exact HTTPS site URL must simply be in Supabase's redirect

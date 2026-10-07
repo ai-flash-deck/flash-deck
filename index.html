@@ -101,6 +101,8 @@
   .auth-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
   .auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--panel-line); }
   .auth-email { display: grid; gap: 7px; color: var(--muted); font-size: 12px; }
+  #auth-email-form { display: grid; gap: 10px; }
+  #auth-email-form .auth-actions { margin-top: 0; }
   .auth-email input {
     width: 100%;
     padding: 10px 11px;
@@ -750,7 +752,14 @@
             Email address
             <input id="auth-email" name="email" type="email" autocomplete="email" required>
           </label>
-          <button class="session-button" type="submit">Email me a sign-in link</button>
+          <label class="auth-email" for="auth-password">
+            Password
+            <input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="8" required>
+          </label>
+          <div class="auth-actions">
+            <button class="session-button" type="submit" data-auth-action="sign_in">Sign In with Email</button>
+            <button class="session-button secondary" type="submit" data-auth-action="sign_up">Create Account</button>
+          </div>
         </form>
       </div>
       <p class="auth-message" id="auth-message" role="status"></p>
@@ -5909,18 +5918,30 @@ authEmailForm.addEventListener("submit", async event => {
     authMessage.textContent = "Sign-in is not configured yet. You can continue practicing without an account.";
     return;
   }
-  const submit = authEmailForm.querySelector('button[type="submit"]');
-  submit.disabled = true;
+  const buttons = [...authEmailForm.querySelectorAll('button[type="submit"]')];
+  const action = event.submitter?.dataset.authAction || "sign_in";
+  buttons.forEach(button => { button.disabled = true; });
   authMessage.className = "auth-message";
-  authMessage.textContent = "Sending your sign-in link…";
+  authMessage.textContent = action === "sign_up" ? "Creating your account…" : "Signing in…";
   try {
-    await authService.signInWithEmail(document.getElementById("auth-email").value.trim(), authRedirectUrl());
-    authMessage.textContent = "Check your email for a sign-in link. You can close this window and keep practicing.";
+    const email = document.getElementById("auth-email").value.trim();
+    const password = document.getElementById("auth-password").value;
+    if (action === "sign_up") {
+      const result = await authService.signUpWithPassword(email, password, authRedirectUrl());
+      authMessage.textContent = result?.data?.session
+        ? "Account created. You are signed in."
+        : "Account created. Check your email to confirm your address, then sign in.";
+    } else {
+      await authService.signInWithPassword(email, password);
+      authMessage.textContent = "Signed in successfully.";
+    }
   } catch (_error) {
     authMessage.className = "auth-message error";
-    authMessage.textContent = "The sign-in link could not be sent. Check your connection and try again.";
+    authMessage.textContent = action === "sign_up"
+      ? "The account could not be created. Check your details and try again."
+      : "Email or password was not accepted. Check your details and try again.";
   } finally {
-    submit.disabled = false;
+    buttons.forEach(button => { button.disabled = false; });
   }
 });
 authSignOut.addEventListener("click", async () => {

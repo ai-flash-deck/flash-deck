@@ -134,8 +134,8 @@ the latest status across durable `progress.assessmentEvents`.
 ### Optional authentication
 
 Supabase Auth is the managed identity provider. It is compatible with this static
-application through its browser client, supports Google OAuth and passwordless
-email, restores its own browser session, and requires no custom authentication
+application through its browser client, supports Google OAuth and email/password
+accounts, restores its own browser session, and requires no custom authentication
 backend. `auth-service.js` loads the pinned Supabase UMD client only when valid
 public configuration exists, so missing configuration or network access never
 prevents the local deck from loading.
@@ -147,9 +147,9 @@ not receive the Supabase client or provider user. `onAuthStateChange` updates th
 identity after redirect completion, token restoration, refresh, and sign-out.
 Sign-out uses local scope and does not clear application learning storage.
 
-Google uses Supabase's redirect OAuth flow. Email uses Supabase-managed magic
-links via `signInWithOtp`; no application password handling or credential storage
-is introduced. Both return to the current origin and pathname. That exact URL
+Google uses Supabase's redirect OAuth flow. Email accounts use Supabase-managed
+`signUp` and `signInWithPassword`; the application does not store passwords.
+Signup confirmation returns to the current origin and pathname. That exact URL
 must be allowed in Supabase Authentication URL Configuration for production and
 local development. Google Cloud redirects to Supabase's provider callback, while
 the application return URL is configured in Supabase. A production email flow

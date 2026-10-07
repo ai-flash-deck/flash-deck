@@ -453,7 +453,8 @@
               return { data: { subscription: { unsubscribe() {} } } };
             },
             signInWithOAuth: async payload => ({ data: payload, error: null }),
-            signInWithOtp: async payload => ({ data: payload, error: null }),
+            signInWithPassword: async payload => ({ data: payload, error: null }),
+            signUp: async payload => ({ data: payload, error: null }),
             signOut: async () => ({ error: signOutError })
           } },
           emit(event, nextSession) { if (listener) listener(event, nextSession); }
@@ -519,12 +520,17 @@
         await service.signOut();
         equal(api.deriveOverallProgress(cards, events), before);
       });
-      test("T73: Google and email flows pass provider-neutral redirect inputs", async () => {
+      test("T73: Google and email-password sign-in use provider-neutral inputs", async () => {
         const service = authApi.createAuthService(fakeAuthClient().client);
         const google = await service.signInWithGoogle("https://example.test/");
-        const email = await service.signInWithEmail("learner@example.com", "https://example.test/");
+        const email = await service.signInWithPassword("learner@example.com", "correct-password");
         equal(google.data, { provider: "google", options: { redirectTo: "https://example.test/" } });
-        equal(email.data, { email: "learner@example.com", options: { emailRedirectTo: "https://example.test/" } });
+        equal(email.data, { email: "learner@example.com", password: "correct-password" });
+      });
+      test("T74: email-password sign-up passes the configured confirmation redirect", async () => {
+        const service = authApi.createAuthService(fakeAuthClient().client);
+        const result = await service.signUpWithPassword("new@example.com", "correct-password", "https://example.test/");
+        equal(result.data, { email: "new@example.com", password: "correct-password", options: { emailRedirectTo: "https://example.test/" } });
       });
 
       let passed = 0;

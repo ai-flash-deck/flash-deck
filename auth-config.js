@@ -6,6 +6,6 @@
  * a service-role key, database password, or Google client secret in this file.
  */
 window.AIML_AUTH_CONFIG = Object.freeze({
-  supabaseUrl: "",
-  supabasePublishableKey: ""
+  supabaseUrl: "https://qgrkhsxzzuyiddglvhkb.supabase.co",
+  supabasePublishableKey: "sb_publishable_-2iD6Dk3zdlG80qkGyZDEQ_cWAgVL8l"
 });
