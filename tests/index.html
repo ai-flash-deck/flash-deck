@@ -554,7 +554,8 @@
       test("T78: password and Create Account controls are absent", () => {
         equal(app.document.querySelector('input[type="password"]'), null);
         assert(!app.document.body.textContent.includes("Create Account"));
-        assert(app.document.getElementById("auth-email-form").textContent.includes("Email me a sign-in link"));
+        assert(!app.document.body.textContent.includes("Sign Up"));
+        assert(app.document.getElementById("auth-email-form").textContent.includes("Continue with email"));
       });
       test("T79: magic-link submission shows loading, blocks repeats, and reports success", async () => {
         let calls = 0;
@@ -567,13 +568,15 @@
         const submit = form.querySelector('button[type="submit"]');
         app.document.getElementById("auth-email").value = "learner@example.com";
         form.dispatchEvent(new app.SubmitEvent("submit", { bubbles: true, cancelable: true, submitter: submit }));
-        equal([submit.disabled, app.document.getElementById("auth-message").textContent, calls], [true, "Sending your sign-in link…", 1]);
+        equal([submit.disabled, submit.textContent, form.getAttribute("aria-busy"), calls], [true, "Sending link…", "true", 1]);
         form.dispatchEvent(new app.SubmitEvent("submit", { bubbles: true, cancelable: true, submitter: submit }));
         equal(calls, 1);
         resolveRequest({ data: {} });
         await request;
         await new Promise(resolve => app.setTimeout(resolve, 0));
-        equal([submit.disabled, app.document.getElementById("auth-message").textContent], [false, "Check your email for your sign-in link."]);
+        equal([submit.disabled, submit.textContent, form.hasAttribute("aria-busy")], [false, "Continue with email", false]);
+        assert(!app.document.getElementById("auth-email-success").hidden);
+        equal(app.document.getElementById("auth-sent-email").textContent, "learner@example.com");
       });
       test("T80: failed magic-link submission restores controls and shows a safe error", async () => {
         app.__testAuthService = { signInWithEmail: async () => { throw new Error("offline"); } };
@@ -584,7 +587,7 @@
         form.dispatchEvent(new app.SubmitEvent("submit", { bubbles: true, cancelable: true, submitter: submit }));
         await new Promise(resolve => app.setTimeout(resolve, 0));
         assert(!submit.disabled);
-        assert(app.document.getElementById("auth-message").textContent.includes("could not be sent"));
+        assert(app.document.getElementById("auth-message").textContent.includes("couldn't send"));
       });
       test("T81: anonymous study controls remain available without authentication", () => {
         equal(app.document.getElementById("auth-status").textContent, "Practice without an account");
@@ -597,6 +600,39 @@
         assert(detect("https://example.test/?error=server_error"));
         assert(!detect("https://example.test/"));
         assert(!detect("not a url"));
+      });
+      test("T83: sign-in hierarchy uses the intended welcome and divider copy", () => {
+        equal(app.document.getElementById("auth-heading").textContent, "Sign in to your AI/ML Interview Deck");
+        assert(app.document.getElementById("auth-default").textContent.includes("Welcome back"));
+        assert(app.document.getElementById("auth-default").textContent.includes("OR CONTINUE WITH EMAIL"));
+        assert(app.document.getElementById("auth-google").textContent.includes("Continue with Google"));
+      });
+      test("T84: Use a different email returns to the entry state and preserves the address", () => {
+        const email = app.document.getElementById("auth-email");
+        email.value = "keep@example.com";
+        app.eval("showEmailSuccess")("keep@example.com");
+        app.document.getElementById("auth-change-email").click();
+        assert(!app.document.getElementById("auth-default").hidden);
+        assert(app.document.getElementById("auth-email-success").hidden);
+        equal(email.value, "keep@example.com");
+      });
+      test("T85: empty email is rejected before reaching the provider", async () => {
+        const service = authApi.createAuthService(fakeAuthClient().client);
+        let rejected = false;
+        try { await service.signInWithEmail("", "https://example.test/"); } catch (_error) { rejected = true; }
+        assert(rejected);
+      });
+      test("T86: Google initiation shows loading and recovers from provider failure", async () => {
+        app.__testAuthService = { signInWithGoogle: async () => { throw new Error("provider unavailable"); } };
+        app.eval("authService = window.__testAuthService");
+        const button = app.document.getElementById("auth-google");
+        button.click();
+        assert(button.disabled);
+        equal(button.querySelector("span:last-child").textContent, "Opening Google…");
+        await new Promise(resolve => app.setTimeout(resolve, 0));
+        assert(!button.disabled);
+        equal(button.querySelector("span:last-child").textContent, "Continue with Google");
+        assert(app.document.getElementById("auth-message").textContent.includes("could not be started"));
       });
 
       let passed = 0;
