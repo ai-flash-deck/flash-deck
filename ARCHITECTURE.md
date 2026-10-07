@@ -134,22 +134,24 @@ the latest status across durable `progress.assessmentEvents`.
 ### Optional authentication
 
 Supabase Auth is the managed identity provider. It is compatible with this static
-application through its browser client, supports Google OAuth and email/password
-accounts, restores its own browser session, and requires no custom authentication
+application through its browser client, supports Google OAuth and passwordless
+email magic links, restores its own browser session, and requires no custom authentication
 backend. `auth-service.js` loads the pinned Supabase UMD client only when valid
 public configuration exists, so missing configuration or network access never
 prevents the local deck from loading.
 
 The `authService` boundary has four states: `loading`, `anonymous`,
 `authenticated`, and `error`. Provider user objects are reduced to the identity
-contract `{ userId, email? }`. Study, card, Weak Areas, and progress functions do
+contract `{ userId, email?, displayName? }`; `displayName` is optional provider
+presentation metadata. Study, card, Weak Areas, and progress functions do
 not receive the Supabase client or provider user. `onAuthStateChange` updates the
 identity after redirect completion, token restoration, refresh, and sign-out.
 Sign-out uses local scope and does not clear application learning storage.
 
-Google uses Supabase's redirect OAuth flow. Email accounts use Supabase-managed
-`signUp` and `signInWithPassword`; the application does not store passwords.
-Signup confirmation returns to the current origin and pathname. That exact URL
+Google uses Supabase's redirect OAuth flow. Email uses Supabase-managed magic
+links through `signInWithOtp` with `shouldCreateUser: true`, so first-time and
+returning users share one passwordless flow. Magic links return to the current
+origin and pathname. That exact URL
 must be allowed in Supabase Authentication URL Configuration for production and
 local development. Google Cloud redirects to Supabase's provider callback, while
 the application return URL is configured in Supabase. A production email flow
@@ -162,6 +164,10 @@ secrets must never be committed or sent to the browser. The Google secret belong
 in Supabase provider settings. The service worker caches the local auth service
 and configuration files, but does not cache Supabase requests, responses, or
 tokens. Supabase manages its own auth-session storage.
+
+The account surface greets users with the first token of provider-supplied
+`given_name`, `full_name`, or `name` metadata. When none is present it shows the
+neutral `Signed in` label; it never guesses a name from an email address.
 
 Authentication is optional and does not gate any study behavior. An auth error is
 shown only in the account surface; local progress, active sessions, and offline

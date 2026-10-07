@@ -11,10 +11,20 @@
   function identityFromSession(session) {
     const user = session && session.user;
     if (!user || typeof user.id !== "string" || !user.id) return null;
+    const metadata = user.user_metadata && typeof user.user_metadata === "object" ? user.user_metadata : {};
+    const displayName = [metadata.given_name, metadata.full_name, metadata.name]
+      .find(value => typeof value === "string" && value.trim());
     return Object.freeze({
       userId: user.id,
-      ...(typeof user.email === "string" && user.email ? { email: user.email } : {})
+      ...(typeof user.email === "string" && user.email ? { email: user.email } : {}),
+      ...(displayName ? { displayName: displayName.trim() } : {})
     });
+  }
+
+  function isValidEmailAddress(email) {
+    return typeof email === "string"
+      && email.length <= 254
+      && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 
   function createAuthService(client, options = {}) {
@@ -72,23 +82,17 @@
       }
     }
 
-    async function signInWithPassword(email, password) {
-      try {
-        const result = await client.auth.signInWithPassword({ email, password });
-        if (result && result.error) throw result.error;
-        return result;
-      } catch (error) {
+    async function signInWithEmail(email, redirectTo) {
+      const normalizedEmail = typeof email === "string" ? email.trim() : "";
+      if (!isValidEmailAddress(normalizedEmail)) {
+        const error = new Error("Enter a valid email address.");
         publishError(error);
         throw error;
       }
-    }
-
-    async function signUpWithPassword(email, password, redirectTo) {
       try {
-        const result = await client.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: redirectTo }
+        const result = await client.auth.signInWithOtp({
+          email: normalizedEmail,
+          options: { emailRedirectTo: redirectTo, shouldCreateUser: true }
         });
         if (result && result.error) throw result.error;
         return result;
@@ -112,8 +116,7 @@
     return Object.freeze({
       initialize,
       signInWithGoogle,
-      signInWithPassword,
-      signUpWithPassword,
+      signInWithEmail,
       signOut,
       getState: () => state,
       subscribe(listener) {
@@ -169,6 +172,7 @@
   global.AIMLAuth = Object.freeze({
     AUTH_STATES,
     identityFromSession,
+    isValidEmailAddress,
     createAuthService,
     createConfiguredAuthService,
     hasPublicAuthConfig

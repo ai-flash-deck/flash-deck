@@ -102,7 +102,6 @@
   .auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--panel-line); }
   .auth-email { display: grid; gap: 7px; color: var(--muted); font-size: 12px; }
   #auth-email-form { display: grid; gap: 10px; }
-  #auth-email-form .auth-actions { margin-top: 0; }
   .auth-email input {
     width: 100%;
     padding: 10px 11px;
@@ -752,14 +751,8 @@
             Email address
             <input id="auth-email" name="email" type="email" autocomplete="email" required>
           </label>
-          <label class="auth-email" for="auth-password">
-            Password
-            <input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="8" required>
-          </label>
-          <div class="auth-actions">
-            <button class="session-button" type="submit" data-auth-action="sign_in">Sign In with Email</button>
-            <button class="session-button secondary" type="submit" data-auth-action="sign_up">Create Account</button>
-          </div>
+          <p class="session-copy">No password needed. We'll email you a secure sign-in link.</p>
+          <button class="session-button" type="submit">Email me a sign-in link</button>
         </form>
       </div>
       <p class="auth-message" id="auth-message" role="status"></p>
@@ -5844,6 +5837,23 @@ function authRedirectUrl() {
   return `${window.location.origin}${window.location.pathname}`;
 }
 
+function hasAuthCallbackError(href) {
+  try {
+    const url = new URL(href);
+    const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+    return url.searchParams.has("error") || url.searchParams.has("error_code")
+      || hash.has("error") || hash.has("error_code");
+  } catch (_error) {
+    return false;
+  }
+}
+
+function friendlyAuthLabel(identity) {
+  const displayName = typeof identity?.displayName === "string" ? identity.displayName.trim() : "";
+  if (!displayName) return "Signed in";
+  return `Hi, ${displayName.split(/\s+/)[0]}`;
+}
+
 function renderAuthState(state) {
   const identity = state?.identity || null;
   const authenticated = Boolean(identity);
@@ -5851,9 +5861,9 @@ function renderAuthState(state) {
   authSignOut.hidden = !authenticated;
   if (state?.status === AIMLAuth.AUTH_STATES.loading) authStatus.textContent = "Checking sign-in status…";
   else if (state?.status === AIMLAuth.AUTH_STATES.error) authStatus.textContent = authenticated
-    ? `${identity.email || "Signed in"} · connection issue`
+    ? `${friendlyAuthLabel(identity)} · connection issue`
     : "Sign-in unavailable · local practice works";
-  else if (authenticated) authStatus.textContent = identity.email || "Signed in";
+  else if (authenticated) authStatus.textContent = friendlyAuthLabel(identity);
   else authStatus.textContent = "Practice without an account";
 
   if (state?.status === AIMLAuth.AUTH_STATES.error) {
@@ -5883,6 +5893,12 @@ async function initializeAuthentication() {
   try {
     authService = await AIMLAuth.createConfiguredAuthService(config, { onChange: renderAuthState });
     await authService.initialize();
+    if (hasAuthCallbackError(window.location.href)) {
+      showAuthDialog();
+      authMessage.className = "auth-message error";
+      authMessage.textContent = "This sign-in link is invalid or expired. Request a new link and try again.";
+      window.history.replaceState({}, document.title, authRedirectUrl());
+    }
   } catch (error) {
     console.warn("Authentication initialization failed; local study remains available.", error);
     renderAuthState({ status: AIMLAuth.AUTH_STATES.error, identity: null, error });
@@ -5918,30 +5934,20 @@ authEmailForm.addEventListener("submit", async event => {
     authMessage.textContent = "Sign-in is not configured yet. You can continue practicing without an account.";
     return;
   }
-  const buttons = [...authEmailForm.querySelectorAll('button[type="submit"]')];
-  const action = event.submitter?.dataset.authAction || "sign_in";
-  buttons.forEach(button => { button.disabled = true; });
+  const submit = authEmailForm.querySelector('button[type="submit"]');
+  if (submit.disabled) return;
+  submit.disabled = true;
   authMessage.className = "auth-message";
-  authMessage.textContent = action === "sign_up" ? "Creating your account…" : "Signing in…";
+  authMessage.textContent = "Sending your sign-in link…";
   try {
     const email = document.getElementById("auth-email").value.trim();
-    const password = document.getElementById("auth-password").value;
-    if (action === "sign_up") {
-      const result = await authService.signUpWithPassword(email, password, authRedirectUrl());
-      authMessage.textContent = result?.data?.session
-        ? "Account created. You are signed in."
-        : "Account created. Check your email to confirm your address, then sign in.";
-    } else {
-      await authService.signInWithPassword(email, password);
-      authMessage.textContent = "Signed in successfully.";
-    }
+    await authService.signInWithEmail(email, authRedirectUrl());
+    authMessage.textContent = "Check your email for your sign-in link.";
   } catch (_error) {
     authMessage.className = "auth-message error";
-    authMessage.textContent = action === "sign_up"
-      ? "The account could not be created. Check your details and try again."
-      : "Email or password was not accepted. Check your details and try again.";
+    authMessage.textContent = "The sign-in link could not be sent. Check your email and connection, then try again.";
   } finally {
-    buttons.forEach(button => { button.disabled = false; });
+    submit.disabled = false;
   }
 });
 authSignOut.addEventListener("click", async () => {
@@ -5960,7 +5966,11 @@ populateSessionTopics();
 render();
 if (session?.status === "completed") showSummary();
 else showDeck();
-initializeAuthentication();
+if (new URLSearchParams(window.location.search).has("regression-test")) {
+  renderAuthState({ status: AIMLAuth.AUTH_STATES.anonymous, identity: null, error: null });
+} else {
+  initializeAuthentication();
+}
 </script>
 
 <script>

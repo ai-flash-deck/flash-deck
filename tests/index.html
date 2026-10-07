@@ -453,8 +453,7 @@
               return { data: { subscription: { unsubscribe() {} } } };
             },
             signInWithOAuth: async payload => ({ data: payload, error: null }),
-            signInWithPassword: async payload => ({ data: payload, error: null }),
-            signUp: async payload => ({ data: payload, error: null }),
+            signInWithOtp: async payload => ({ data: payload, error: null }),
             signOut: async () => ({ error: signOutError })
           } },
           emit(event, nextSession) { if (listener) listener(event, nextSession); }
@@ -520,17 +519,84 @@
         await service.signOut();
         equal(api.deriveOverallProgress(cards, events), before);
       });
-      test("T73: Google and email-password sign-in use provider-neutral inputs", async () => {
+      test("T73: Google and magic-link flows pass provider-neutral inputs", async () => {
         const service = authApi.createAuthService(fakeAuthClient().client);
         const google = await service.signInWithGoogle("https://example.test/");
-        const email = await service.signInWithPassword("learner@example.com", "correct-password");
+        const email = await service.signInWithEmail(" learner@example.com ", "https://example.test/");
         equal(google.data, { provider: "google", options: { redirectTo: "https://example.test/" } });
-        equal(email.data, { email: "learner@example.com", password: "correct-password" });
+        equal(email.data, { email: "learner@example.com", options: { emailRedirectTo: "https://example.test/", shouldCreateUser: true } });
       });
-      test("T74: email-password sign-up passes the configured confirmation redirect", async () => {
+      test("T74: valid non-Gmail addresses are accepted and invalid email is rejected", async () => {
         const service = authApi.createAuthService(fakeAuthClient().client);
-        const result = await service.signUpWithPassword("new@example.com", "correct-password", "https://example.test/");
-        equal(result.data, { email: "new@example.com", password: "correct-password", options: { emailRedirectTo: "https://example.test/" } });
+        assert(authApi.isValidEmailAddress("learner@yahoo.com"));
+        assert(!authApi.isValidEmailAddress("not-an-email"));
+        let rejected = false;
+        try { await service.signInWithEmail("not-an-email", "https://example.test/"); } catch (_error) { rejected = true; }
+        assert(rejected);
+      });
+      test("T75: provider failure produces auth error without touching study state", async () => {
+        const before = api.deriveOverallProgress(cards, api.progress.assessmentEvents);
+        const fake = fakeAuthClient();
+        fake.client.auth.signInWithOtp = async () => ({ data: null, error: new Error("rate limited") });
+        const service = authApi.createAuthService(fake.client);
+        try { await service.signInWithEmail("learner@outlook.com", "https://example.test/"); } catch (_error) {}
+        equal(service.getState().status, "error");
+        equal(api.deriveOverallProgress(cards, api.progress.assessmentEvents), before);
+      });
+      test("T76: provider display name produces a first-name greeting", () => {
+        const identity = authApi.identityFromSession({ user: { id: "user_named", email: "vivek@example.com", user_metadata: { full_name: "Vivek Gupta" } } });
+        equal([identity.userId, identity.displayName, app.eval("friendlyAuthLabel")(identity)], ["user_named", "Vivek Gupta", "Hi, Vivek"]);
+      });
+      test("T77: missing display metadata uses a neutral greeting without deriving email", () => {
+        const identity = authApi.identityFromSession({ user: { id: "user_email", email: "made.up.name@example.com", user_metadata: {} } });
+        equal(app.eval("friendlyAuthLabel")(identity), "Signed in");
+      });
+      test("T78: password and Create Account controls are absent", () => {
+        equal(app.document.querySelector('input[type="password"]'), null);
+        assert(!app.document.body.textContent.includes("Create Account"));
+        assert(app.document.getElementById("auth-email-form").textContent.includes("Email me a sign-in link"));
+      });
+      test("T79: magic-link submission shows loading, blocks repeats, and reports success", async () => {
+        let calls = 0;
+        let resolveRequest;
+        const request = new Promise(resolve => { resolveRequest = resolve; });
+        app.eval("authService = window.__testAuthService");
+        app.__testAuthService = { signInWithEmail: () => { calls++; return request; } };
+        app.eval("authService = window.__testAuthService");
+        const form = app.document.getElementById("auth-email-form");
+        const submit = form.querySelector('button[type="submit"]');
+        app.document.getElementById("auth-email").value = "learner@example.com";
+        form.dispatchEvent(new app.SubmitEvent("submit", { bubbles: true, cancelable: true, submitter: submit }));
+        equal([submit.disabled, app.document.getElementById("auth-message").textContent, calls], [true, "Sending your sign-in link…", 1]);
+        form.dispatchEvent(new app.SubmitEvent("submit", { bubbles: true, cancelable: true, submitter: submit }));
+        equal(calls, 1);
+        resolveRequest({ data: {} });
+        await request;
+        await new Promise(resolve => app.setTimeout(resolve, 0));
+        equal([submit.disabled, app.document.getElementById("auth-message").textContent], [false, "Check your email for your sign-in link."]);
+      });
+      test("T80: failed magic-link submission restores controls and shows a safe error", async () => {
+        app.__testAuthService = { signInWithEmail: async () => { throw new Error("offline"); } };
+        app.eval("authService = window.__testAuthService");
+        const form = app.document.getElementById("auth-email-form");
+        const submit = form.querySelector('button[type="submit"]');
+        app.document.getElementById("auth-email").value = "learner@example.com";
+        form.dispatchEvent(new app.SubmitEvent("submit", { bubbles: true, cancelable: true, submitter: submit }));
+        await new Promise(resolve => app.setTimeout(resolve, 0));
+        assert(!submit.disabled);
+        assert(app.document.getElementById("auth-message").textContent.includes("could not be sent"));
+      });
+      test("T81: anonymous study controls remain available without authentication", () => {
+        equal(app.document.getElementById("auth-status").textContent, "Practice without an account");
+        assert(!app.document.querySelector('[data-session-type="quick"]').disabled);
+        assert(!app.document.querySelector('[data-session-type="full"]').disabled);
+      });
+      test("T82: expired or invalid auth callbacks are detected safely", () => {
+        const detect = app.eval("hasAuthCallbackError");
+        assert(detect("https://example.test/#error=access_denied&error_code=otp_expired"));
+        assert(detect("https://example.test/?error=server_error"));
+        assert(!detect("https://example.test/"));
+        assert(!detect("not a url"));
       });
 
       let passed = 0;
