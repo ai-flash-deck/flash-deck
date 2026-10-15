@@ -214,6 +214,36 @@ Authentication is optional and does not gate any study behavior. An auth error i
 shown only in the account surface; local progress, active sessions, and offline
 study continue.
 
+### Release packaging, cache coherence, and recovery
+
+Production hosting publishes the checked-in `dist/` directory declared by
+`netlify.toml`. `scripts/package-release.ps1` recreates it from a ten-file runtime
+allowlist, excluding tests, internal documentation, database migrations, development
+scripts, local profiles, and Git metadata. The browser application remains a static,
+dependency-free PWA; packaging is a deterministic copy step rather than a runtime
+build system.
+
+All local JavaScript tags and service-worker app-shell entries use the same explicit
+asset version. Cache `aiml-deck-v24` requests `?v=24` scripts, so the existing v22
+worker's unversioned cache entries cannot satisfy a new page's script requests. The
+new worker pre-caches the coherent shell, activates immediately, deletes older named
+caches, and claims clients. Cross-origin authentication and data traffic remains
+outside the application cache.
+
+The recovery packager creates `recovery-dist/` from the same schema-5 source. It
+changes only the public authentication configuration and cache/asset namespace:
+authentication and cloud sync remain off, while schema-5 persistence continues to
+preserve anonymous events, account buckets, pending IDs, conflicts, and claim
+decisions. This local artifact is intended for a same-origin emergency roll-forward,
+not an ordinary release. It is excluded from Git and from the Netlify production
+package.
+
+The schema-4 production version is not a data-safe rollback after schema-5 migration.
+It treats schema-5 storage as unsupported and can overwrite it after a new assessment.
+Operational recovery therefore prefers a schema-5 hotfix, with the recovery artifact
+available only when local practice in the normal build is unavailable. Detailed
+release and dashboard checks are in `docs/production-release.md`.
+
 ### Cloud learning-history synchronization
 
 The shared configured Supabase client is passed separately to `authService` and

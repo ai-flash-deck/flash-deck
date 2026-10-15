@@ -13,7 +13,7 @@
   <h1>Core regression tests</h1>
   <p id="summary">Running…</p>
   <ol id="results"></ol>
-  <iframe id="app" src="../index.html?regression-test=1"></iframe>
+  <iframe id="app"></iframe>
   <script>
     const tests = [];
     const test = (name, run) => tests.push({ name, run });
@@ -26,6 +26,7 @@
     };
 
     document.getElementById("app").addEventListener("load", async event => {
+      if (!event.currentTarget.src.includes("/index.html")) return;
       const app = event.currentTarget.contentWindow;
       const api = app.eval(`({
         CARDS, TOPICS, topicsById, SESSION_TYPES, LEGACY_QUESTION_ID_MAP, PERSISTENCE_SCHEMA_VERSION, SESSION_SCHEMA_VERSION,
@@ -1001,6 +1002,145 @@
         assert(app.document.getElementById("sync-status").hidden);
       });
 
+      const fetchText = async path => {
+        const response = await fetch(`${path}?release-test=${Date.now()}`, { cache: "no-store" });
+        assert(response.ok, `${path} returned ${response.status}`);
+        return response.text();
+      };
+
+      test("T114: generated production package contains every required runtime asset", async () => {
+        const required = [
+          "index.html", "auth-config.js", "auth-service.js", "learning-sync.js",
+          "remote-assessment-repository.js", "sw.js", "manifest.json",
+          "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png"
+        ];
+        const responses = await Promise.all(required.map(path => fetch(`../dist/${path}`, { cache: "no-store" })));
+        assert(responses.every(response => response.ok), "one or more production assets are missing");
+      });
+
+      test("T115: generated production package excludes internal and development files", async () => {
+        const excluded = [
+          "tests/index.html", "docs/iteration-7-cloud-persistence-design.md",
+          "supabase/migrations/202610140001_create_assessment_events.sql",
+          "scripts/package-release.ps1", "README.md", "ARCHITECTURE.md", ".git/HEAD"
+        ];
+        const responses = await Promise.all(excluded.map(path => fetch(`../dist/${path}`, { cache: "no-store" })));
+        assert(responses.every(response => response.status === 404), "an internal file is present in the production package");
+      });
+
+      test("T116: production HTML references one consistent version of every local script", async () => {
+        const html = await fetchText("../dist/index.html");
+        const expected = [
+          "auth-config.js?v=24", "auth-service.js?v=24",
+          "learning-sync.js?v=24", "remote-assessment-repository.js?v=24"
+        ];
+        assert(expected.every(path => html.includes(`src="${path}"`)), "production script versions are inconsistent");
+      });
+
+      test("T117: production service worker caches the matching version and cleans old caches", async () => {
+        const worker = await fetchText("../dist/sw.js");
+        assert(worker.includes('const CACHE_VERSION = "aiml-deck-v24";'));
+        [
+          "./auth-config.js?v=24", "./auth-service.js?v=24",
+          "./learning-sync.js?v=24", "./remote-assessment-repository.js?v=24"
+        ].forEach(path => assert(worker.includes(`"${path}"`), `missing worker entry ${path}`));
+        assert(worker.includes("self.skipWaiting()"), "new worker does not activate promptly");
+        assert(worker.includes("keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))"), "old caches are not removed");
+        assert(worker.includes("self.clients.claim()"), "new worker does not claim open clients");
+      });
+
+      test("T118: old v22 cache keys cannot satisfy the new application script requests", async () => {
+        const html = await fetchText("../dist/index.html");
+        const requested = [...html.matchAll(/<script src="([^"]+)"/g)].map(match => `./${match[1]}`);
+        const oldV22Keys = new Set([
+          "./auth-config.js", "./auth-service.js", "./learning-sync.js", "./remote-assessment-repository.js"
+        ]);
+        equal(requested.length, 4);
+        assert(requested.every(path => path.includes("?v=24") && !oldV22Keys.has(path)), "a v24 request reuses a v22 cache key");
+      });
+
+      test("T119: emergency recovery package has isolated cache keys and disables cloud configuration", async () => {
+        const [html, worker, config] = await Promise.all([
+          fetchText("../recovery-dist/index.html"),
+          fetchText("../recovery-dist/sw.js"),
+          fetchText("../recovery-dist/auth-config.js")
+        ]);
+        assert(html.includes("auth-service.js?v=24-recovery-1"));
+        assert(html.includes("learning-sync.js?v=24-recovery-1"));
+        assert(worker.includes('const CACHE_VERSION = "aiml-deck-recovery-v1";'));
+        assert(worker.includes("./auth-config.js?v=24-recovery-1"));
+        assert(config.includes('supabaseUrl: ""') && config.includes('supabasePublishableKey: ""'));
+      });
+
+      test("T120: emergency recovery uses the unchanged schema-5 persistence implementation", async () => {
+        const [source, recovery] = await Promise.all([
+          fetchText("../learning-sync.js"), fetchText("../recovery-dist/learning-sync.js")
+        ]);
+        equal(recovery, source);
+        assert(recovery.includes("const LOCAL_SCHEMA_VERSION = 5;"));
+        assert(recovery.includes("const DOMAIN_MIGRATION_VERSION = 4;"));
+      });
+
+      test("T121: recovery startup and local writes preserve anonymous, account, pending, and conflict data", async () => {
+        const priorRaw = app.localStorage.getItem(api.PROGRESS_KEY);
+        const anonymousEvent = { id: "recovery_anon", questionId: ids[0], sessionId: null, result: "known", assessedAt: stamp };
+        const accountEvent = { id: "recovery_account", questionId: ids[1], sessionId: "session_a", result: "known", assessedAt: stamp };
+        const pendingEvent = { id: "recovery_pending", questionId: ids[2], sessionId: "session_a", result: "needs_review", assessedAt: stamp };
+        const remoteConflict = { id: "recovery_conflict", questionId: ids[3], sessionId: "session_a", result: "known", assessedAt: stamp };
+        const localConflict = { ...remoteConflict, result: "needs_review" };
+        const conflict = {
+          reason: "same_id_different_payload",
+          status: "unresolved",
+          localEvent: localConflict,
+          remoteEvent: remoteConflict,
+          detectedAt: "2026-10-14T12:00:00.000Z"
+        };
+        const state = {
+          schemaVersion: 5,
+          domainMigrationVersion: 4,
+          anonymous: { revision: 1, assessmentEvents: [anonymousEvent], conflicts: {} },
+          users: {
+            user_recovery: {
+              assessmentEvents: [accountEvent, pendingEvent, remoteConflict],
+              pendingEventIds: [pendingEvent.id],
+              conflicts: { [remoteConflict.id]: conflict }
+            }
+          },
+          claimDecisions: {}
+        };
+        const frame = document.createElement("iframe");
+        try {
+          app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify(state));
+          const loaded = new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error("recovery build did not load")), 5000);
+            frame.addEventListener("load", () => { clearTimeout(timeout); resolve(); }, { once: true });
+          });
+          frame.src = `../recovery-dist/index.html?regression-test=1&recovery-test=${Date.now()}`;
+          document.body.appendChild(frame);
+          await loaded;
+          const recoveryWindow = frame.contentWindow;
+          const recoveryRepository = recoveryWindow.eval("localAssessmentRepository");
+          equal(recoveryRepository.snapshot(), state);
+          const newAnonymousEvent = { id: "recovery_new_anon", questionId: ids[4], sessionId: null, result: "known", assessedAt: "2026-10-14T13:00:00.000Z" };
+          assert(recoveryRepository.append(recoveryWindow.AIMLLearningSync.ANONYMOUS_OWNER, newAnonymousEvent));
+          const after = recoveryRepository.snapshot();
+          equal(after.users, state.users);
+          equal(after.anonymous.assessmentEvents, [anonymousEvent, newAnonymousEvent]);
+          equal(after.anonymous.conflicts, state.anonymous.conflicts);
+          equal(after.schemaVersion, 5);
+          equal(after.domainMigrationVersion, 4);
+        } finally {
+          frame.remove();
+          if (priorRaw === null) app.localStorage.removeItem(api.PROGRESS_KEY);
+          else app.localStorage.setItem(api.PROGRESS_KEY, priorRaw);
+        }
+      });
+
+      test("T122: Netlify publishes only the generated production directory", async () => {
+        const config = await fetchText("../netlify.toml");
+        assert(/publish\s*=\s*"dist"/.test(config));
+      });
+
       let passed = 0;
       const list = document.getElementById("results");
       for (const current of tests) {
@@ -1021,6 +1161,9 @@
       document.getElementById("summary").textContent = `${passed}/${tests.length} passed; ${failed} failed`;
       document.body.dataset.status = failed ? "failed" : "passed";
     });
+    setTimeout(() => {
+      document.getElementById("app").src = "../dist/index.html?regression-test=1";
+    }, 0);
   </script>
 </body>
 </html>

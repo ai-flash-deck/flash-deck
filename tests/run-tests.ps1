@@ -13,6 +13,10 @@ $profile = Join-Path $repoRoot (".edge-test-" + [guid]::NewGuid().ToString("N"))
 $server = $null
 $originalSystemDrive = $env:SystemDrive
 try {
+  $packageScript = Join-Path $repoRoot "scripts\package-release.ps1"
+  & $packageScript -Mode Production
+  & $packageScript -Mode Recovery
+
   if ($env:SystemDrive -notmatch "^[A-Za-z]:$") {
     $env:SystemDrive = [IO.Path]::GetPathRoot($repoRoot).TrimEnd([IO.Path]::DirectorySeparatorChar)
   }
@@ -53,7 +57,7 @@ try {
 
   $browserOut = Join-Path $repoRoot (".edge-test-output-" + [guid]::NewGuid().ToString("N") + ".txt")
   $browserErr = Join-Path $repoRoot (".edge-test-error-" + [guid]::NewGuid().ToString("N") + ".txt")
-  $browserArgs = "--headless=new --disable-gpu --disable-software-rasterizer --no-sandbox --no-first-run --user-data-dir=`"$profile`" --virtual-time-budget=10000 --dump-dom http://127.0.0.1:$port/tests/"
+  $browserArgs = "--headless=new --disable-gpu --disable-software-rasterizer --no-sandbox --no-first-run --user-data-dir=`"$profile`" --virtual-time-budget=30000 --dump-dom http://127.0.0.1:$port/tests/"
   $browser = Start-Process -FilePath $edge -ArgumentList $browserArgs -RedirectStandardOutput $browserOut -RedirectStandardError $browserErr -PassThru -Wait
   $html = Get-Content -LiteralPath $browserOut -Raw
   $summary = [regex]::Match(($html -join "`n"), '<p id="summary">([^<]+)</p>').Groups[1].Value
@@ -63,7 +67,11 @@ try {
     throw "The browser test page did not finish."
   }
   Write-Host $summary
-  if (($html -join "`n") -notmatch '<body data-status="passed">') { exit 1 }
+  if (($html -join "`n") -notmatch '<body data-status="passed">') {
+    $rendered = ($html -join "`n")
+    Write-Host $rendered.Substring([Math]::Max(0, $rendered.Length - 6000))
+    exit 1
+  }
 }
 finally {
   $env:SystemDrive = $originalSystemDrive

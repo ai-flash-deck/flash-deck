@@ -2,8 +2,10 @@
 
 A self-contained Progressive Web App (PWA) of flip-card flashcards for highly technical
 AI/ML interviews — ML foundations, probability, deep learning, Transformers & LLMs, and RL.
-Equations render with native MathML and there is no build step. Optional
-authentication loads a pinned Supabase browser client only when configured.
+Equations render with native MathML and the application has no runtime build
+dependency. A small PowerShell release packager copies an explicit runtime allowlist
+for static hosting. Optional authentication loads a pinned Supabase browser client
+only when configured.
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the current state model, persistence
 boundaries, known risks, and the recommended next iteration.
@@ -92,7 +94,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
 
 The runner starts a temporary loopback-only static server and uses the installed
 Microsoft Edge JavaScript runtime. It does not install packages or access the
-internet. The 113 tests cover the 205 immutable question IDs, stable topic IDs,
+internet. The 122 tests cover the 205 immutable question IDs, stable topic IDs,
 canonical assessment semantics, reveal and duplicate guards, Quick and Full
 session selection, result calculation, multi-session assessment history, derived
 status and counters, reload persistence, legacy ID and storage-schema migration,
@@ -108,8 +110,22 @@ in-memory storage and mocked Supabase responses to cover safe migration,
 interruption, account isolation, anonymous import decisions, remote pagination,
 duplicate and conflict handling, retries, stale responses, and deterministic
 local/cloud merging.
-The test page loads the real `index.html`, so these checks execute the production
-functions and production card data.
+The test runner regenerates and loads `dist/index.html`, so these checks execute the
+actual packaged production functions and card data.
+
+The runner also regenerates and verifies the allowlisted production and emergency
+recovery packages. To create them directly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Mode Production
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Mode Recovery
+```
+
+`dist/` is the checked-in production output consumed by Netlify. It contains only
+the application shell and icons. `recovery-dist/` is ignored by Git and generated
+locally when a schema-5-compatible emergency artifact is needed. See
+[`docs/production-release.md`](docs/production-release.md) before publishing either
+artifact.
 
 To inspect individual results visually, serve the repository and open
 `http://localhost:8000/tests/`.

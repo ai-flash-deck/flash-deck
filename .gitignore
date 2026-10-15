@@ -1,0 +1,4 @@
+/recovery-dist/
+/.edge-test-*/
+/.edge-test-output-*.txt
+/.edge-test-error-*.txt
