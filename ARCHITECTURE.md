@@ -5,10 +5,13 @@
 The deck is a static Progressive Web App. There is no framework, router, package
 manager, build step, or third-party test runner. When optional authentication is
 configured, the browser loads the pinned Supabase JavaScript client at runtime.
-`index.html` contains the
-HTML, CSS, question content, UI rendering, study-session logic, and browser
-persistence integration. `sw.js` provides offline caching, while `manifest.json`
-and `icons/` provide installable-PWA metadata and assets.
+`index.html` contains the HTML, CSS, question content, UI rendering, study-session
+logic, and persistence composition. `learning-sync.js` owns schema-5 local
+learning storage, merge rules, and synchronization coordination.
+`remote-assessment-repository.js` owns Supabase assessment-table queries.
+`auth-service.js` owns authentication and creates the one browser client shared
+by the auth and remote-learning repositories. `sw.js` provides offline caching,
+while `manifest.json` and `icons/` provide installable-PWA metadata and assets.
 
 The application has one page and three user-visible states:
 
@@ -24,12 +27,13 @@ responsibilities are kept in recognizable sections:
 - **Content:** `TOPICS`, `topicsById`, `CARDS`, and `cardId`.
 - **Study:** `SESSION_TYPES`, session selection, creation, navigation, and summary
   calculation helpers.
-- **Progress:** durable events in `progress.assessmentEvents`, derived question
-  progress, and active-session response snapshots in `session.responses`.
+- **Progress:** durable events in the active anonymous or account bucket, derived
+  question progress, and active-session response snapshots in `session.responses`.
 - **Identity:** `auth-service.js` exposes provider-neutral auth state and the
   minimum authenticated identity; Supabase-specific calls remain behind it.
-- **Persistence:** `storageRepository`, plus progress/session validation and schema
-  version checks.
+- **Persistence:** `storageRepository`, the owner-aware local assessment
+  repository, the Supabase assessment repository, and the synchronization
+  coordinator.
 - **UI:** DOM references, card rendering, view transitions, and event handlers.
 
 JSDoc types in `index.html` document `Topic`, `Question`, `AssessmentEvent`,
@@ -40,18 +44,53 @@ compiler or dependency.
 
 Two versioned JSON documents are stored in browser `localStorage`:
 
-- `aiml-interview-deck-progress`: durable assessment-event history.
+- `aiml-interview-deck-progress`: schema-5 durable assessment history partitioned
+  into anonymous and per-account buckets.
 - `aiml-interview-deck-session`: the current or most recently completed session,
   including ordered card IDs, position, assessments, topic, and status.
 
-All browser-storage access goes through `storageRepository`. This boundary can
-later be supplemented or replaced by a remote repository without coupling an
-authentication client to card rendering.
+All browser-storage access goes through `storageRepository`. Card rendering and
+study logic never issue Supabase queries.
 
-Both documents use persistence schema version 4. All normal question references
-are immutable IDs stored directly on the card, using `q_0001` through `q_0205`.
+Learning persistence uses schema version 5 and domain migration version 4. The
+active-session document remains schema version 4 because unfinished session
+position and ordering are still local-only. All normal question references are
+immutable IDs stored directly on the card, using `q_0001` through `q_0205`.
 These IDs do not depend on content, category labels, or array order and are
 suitable for future database references.
+
+The schema-5 learning envelope is:
+
+```text
+{
+  schemaVersion: 5,
+  domainMigrationVersion: 4,
+  anonymous: { revision, assessmentEvents, conflicts },
+  users: {
+    "<Supabase user ID>": { assessmentEvents, pendingEventIds, conflicts }
+  },
+  claimDecisions: {
+    "<Supabase user ID>": { declinedRevision? | importedRevision?, decidedAt }
+  },
+  unmappedLegacyResponses?,
+  unmappedAssessmentEvents?
+}
+```
+
+`pendingEventIds` is delivery state rather than a second learning source.
+Derived progress always receives the active owner's `assessmentEvents`.
+Anonymous events never enter an account bucket without an explicit import.
+Signing out switches back to the anonymous bucket and retains every account
+bucket and pending marker on disk.
+
+Schema 4 migrates through `aiml-interview-deck-progress-v5-staging`. The browser
+constructs the schema-5 candidate in memory, writes and verifies staging, then
+atomically replaces and verifies the normal key. Staging is removed only after
+the final record validates. A failed staging or final write leaves the exact
+schema-4 source untouched; the complete in-memory candidate remains available
+for the current page, and a later load retries deterministically. A complete
+schema-5 record is a no-op, making migration idempotent. Malformed source data is
+left unchanged and reported as unsupported rather than replaced.
 
 ### Topic identity
 
@@ -75,8 +114,10 @@ events when later sessions are completed.
 than persisting competing counters. It returns the latest result as both
 `latestResult` and `currentStatus`, the latest `assessedAt` as `lastReviewedAt`,
 and counts for all assessments, `known`, and `needs_review`. Ordering uses valid
-event timestamps. With 205 questions, deriving these values on demand keeps the
-source of truth unambiguous and is inexpensive.
+event timestamps followed by lexicographic event ID when timestamps are equal.
+This makes merged results deterministic regardless of local/remote array order.
+With 205 questions, deriving these values on demand keeps the source of truth
+unambiguous and is inexpensive.
 
 The card interaction requires answer reveal before creating an event. Repeating
 the same choice for the same question presentation and session returns the prior
@@ -171,26 +212,49 @@ neutral `Signed in` label; it never guesses a name from an email address.
 
 Authentication is optional and does not gate any study behavior. An auth error is
 shown only in the account surface; local progress, active sessions, and offline
-study continue. Learning persistence remains schema 4/domain migration 3, and
-`progress.assessmentEvents` remains the sole durable learning source. Signing in
-or out does not add a user ID to events, migrate them, delete them, or claim that
-they are synchronized.
+study continue.
 
-#### Iteration 7 local-to-remote contract
+### Cloud learning-history synchronization
 
-Future remote learning records will belong to the authenticated `userId` and use
-the existing assessment event shape and IDs. The synchronization step must merge
-eligible anonymous local history after authentication, preserve event IDs for
-duplicate-safe idempotency, and retain local history until remote persistence is
-confirmed. Authentication alone must never delete or reassign local history.
-Malformed and unmapped local data must remain recoverable and excluded safely.
-No remote learning tables or synchronization behavior exist in this iteration.
+The shared configured Supabase client is passed separately to `authService` and
+`remote-assessment-repository.js`. The remote repository is the only component
+that queries `public.assessment_events`. It fetches every page of the signed-in
+user's RLS-filtered rows and inserts immutable event payloads without `user_id`.
+It never performs update, delete, or blind upsert operations.
+
+Authenticated assessments are local-first: append to that user's bucket, persist
+the event ID as pending, then request synchronization. Insert success removes only
+the pending marker. A `23505` response triggers an own-row fetch. An identical
+payload is idempotent success; a different payload becomes a durable unresolved
+conflict containing both complete versions. The remote version feeds active
+derived progress, while the local version remains recoverable in the conflict.
+
+Remote restoration merges by event ID within one account. Remote-only events are
+cached locally, matching events deduplicate, local-only eligible events remain
+pending, and an empty or failed remote response never clears local history.
+Unknown question IDs, including RLS test records, remain preserved but are
+excluded by the existing content-aware Progress and Weak Areas selectors and are
+not automatically uploaded.
+
+The coordinator retries on authentication restoration, a new assessment, and the
+browser `online` event. It has a single-flight guard and no polling loop. Network
+or provider failures retain pending events. Each account change increments a
+generation; responses from an earlier account are ignored before any local merge
+or UI update. Sign-out cancels the active generation, keeps account data and
+pending work, and restores the anonymous view.
+
+When eligible anonymous history exists after sign-in, the UI asks before import.
+Import copies events into the account bucket, keeps the anonymous copy, marks new
+account copies pending, and records `importedRevision`. “Not now” records
+`declinedRevision`. Either decision suppresses repeat prompts for the same
+anonymous revision; a later anonymous assessment advances the revision and makes
+the choice available again. Event-ID deduplication makes import retryable.
 
 ### Legacy question-ID migration
 
 Persistence schema version 1 used hashes derived from category and question text.
 `LEGACY_QUESTION_ID_MAP` is a frozen 205-entry compatibility map generated from
-the unchanged pre-migration content. Domain migration version 3 runs before
+the unchanged pre-migration content. The legacy content migrations run before
 progress or session state is loaded:
 
 - Progress response keys are changed to immutable IDs. When legacy and immutable
@@ -213,9 +277,8 @@ progress or session state is loaded:
   an incorrect status.
 - `aiml-interview-deck-migrations` records the migration version and last result.
 
-Schema checks make the migration idempotent: schema-v4 records are recognized as
-current and are not transformed again. Legacy ID lookup is confined to this
-migration boundary; new progress and sessions use immutable IDs exclusively.
+Schema checks make every migration idempotent. Legacy ID lookup is confined to
+the migration boundary; new progress and sessions use immutable IDs exclusively.
 
 Answer reveal is intentionally transient UI state. Every newly rendered question
 starts with its answer hidden; reveal state is not persisted.
@@ -233,11 +296,19 @@ starts with its answer hidden; reveal state is not persisted.
 - Live Google and email authentication require external Supabase, Google OAuth,
   redirect URL, and SMTP configuration. Fake-provider tests verify the code
   boundary, but cannot prove that project-owned external settings are correct.
+- Browser-local history is unencrypted and visible to anyone with access to that
+  browser profile. Owner buckets prevent accidental application-level mixing;
+  they are not device access control.
+- Same-ID conflicts are preserved safely and reported as a sync failure, but a
+  user-facing export or resolution workflow is outside this iteration.
+- Cross-device restoration and real network-failure recovery still require the
+  controlled live validation planned for Iteration 7D.
 
 ## Recommended next structural step
 
-Iteration 7 should add a remote assessment-event repository keyed by authenticated
-`userId`, then implement an idempotent local-to-remote merge using the existing
-event IDs. Resolve same-ID conflicts explicitly, confirm remote writes before any
-local cleanup, and keep `makeCard` and progress derivation provider-independent.
+Iteration 7D should validate configured Google and email sessions, refresh,
+sign-out, anonymous import, account switching, offline retry, and cross-device
+restore against the live Supabase project before production deployment. It should
+not change the schema or synchronization semantics unless that validation finds a
+concrete defect.
 

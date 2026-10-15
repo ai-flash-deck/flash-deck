@@ -160,13 +160,18 @@
     });
   }
 
-  async function createConfiguredAuthService(config, options = {}) {
+  async function createConfiguredAuthContext(config, options = {}) {
     if (!hasPublicAuthConfig(config)) return null;
     const library = await loadSupabaseLibrary(options.documentRef);
     const client = library.createClient(config.supabaseUrl, config.supabasePublishableKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
-    return createAuthService(client, options);
+    return Object.freeze({ client, authService: createAuthService(client, options) });
+  }
+
+  async function createConfiguredAuthService(config, options = {}) {
+    const context = await createConfiguredAuthContext(config, options);
+    return context ? context.authService : null;
   }
 
   global.AIMLAuth = Object.freeze({
@@ -174,6 +179,7 @@
     identityFromSession,
     isValidEmailAddress,
     createAuthService,
+    createConfiguredAuthContext,
     createConfiguredAuthService,
     hasPublicAuthConfig
   });

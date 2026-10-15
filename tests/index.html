@@ -28,17 +28,20 @@
     document.getElementById("app").addEventListener("load", async event => {
       const app = event.currentTarget.contentWindow;
       const api = app.eval(`({
-        CARDS, TOPICS, topicsById, SESSION_TYPES, LEGACY_QUESTION_ID_MAP, PERSISTENCE_SCHEMA_VERSION,
-        PROGRESS_KEY, SESSION_KEY, storageRepository, cardId, cardsById,
+        CARDS, TOPICS, topicsById, SESSION_TYPES, LEGACY_QUESTION_ID_MAP, PERSISTENCE_SCHEMA_VERSION, SESSION_SCHEMA_VERSION,
+        PROGRESS_KEY, PROGRESS_STAGING_KEY, SESSION_KEY, storageRepository, cardId, cardsById,
         resolvePersistedQuestionId, migrateResponseKeys, migrateProgressRecord,
         migrateSessionRecord, loadProgress, loadSession, createSessionState,
         calculateSessionResults, canonicalAssessmentResult, createAssessmentEvent,
         assessQuestionPresentation, makeCard, progress, assessmentHistoryRepository,
         deriveQuestionProgress, isValidAssessmentEvent, getWeakQuestions,
         startWeakSession, deriveOverallProgress, deriveTopicProgress,
-        deriveProgressByTopic, renderProgress
+        deriveProgressByTopic, renderProgress, localAssessmentRepository,
+        refreshActiveProgress, saveAssessment
       })`);
       const authApi = app.AIMLAuth;
+      const syncApi = app.AIMLLearningSync;
+      const remoteApi = app.AIMLRemoteAssessments;
       const cards = api.CARDS;
       const ids = cards.map(api.cardId);
       const topic = api.TOPICS[0];
@@ -55,6 +58,67 @@
         else app.localStorage.setItem(api.PROGRESS_KEY, originalProgress);
         if (originalSession === null) app.localStorage.removeItem(api.SESSION_KEY);
         else app.localStorage.setItem(api.SESSION_KEY, originalSession);
+      };
+      const memoryStorage = (initial = {}, fail = () => false) => {
+        const values = new Map(Object.entries(initial));
+        return {
+          values,
+          readRaw: key => values.has(key) ? values.get(key) : null,
+          writeRaw(key, value) {
+            if (fail(key, value)) return false;
+            values.set(key, value);
+            return true;
+          },
+          remove(key) { values.delete(key); return true; }
+        };
+      };
+      const schema4Record = events => ({
+        schemaVersion: 4,
+        domainMigrationVersion: 3,
+        questionIdMigrationVersion: 1,
+        assessmentEvents: events
+      });
+      const createLocalRepository = (state = syncApi.createEmptyLocalState(), storage = memoryStorage()) => syncApi.createLocalAssessmentRepository({
+        storage,
+        progressKey: "progress",
+        initialState: state,
+        isSyncEligibleEvent: api.isValidAssessmentEvent,
+        now: () => "2026-10-14T12:00:00.000Z"
+      });
+      const fakeSupabaseClient = (initialRows = [], options = {}) => {
+        const rows = initialRows.map(row => ({ ...row }));
+        const calls = { inserts: [], ranges: [] };
+        return {
+          rows,
+          calls,
+          from(table) {
+            assert(table === "assessment_events");
+            let filterId = null;
+            const builder = {
+              select() { return builder; },
+              order() { return builder; },
+              eq(column, value) { if (column === "id") filterId = value; return builder; },
+              async maybeSingle() {
+                if (options.selectError) return { data: null, error: options.selectError };
+                return { data: rows.find(row => row.id === filterId) || null, error: null };
+              },
+              async range(from, to) {
+                calls.ranges.push([from, to]);
+                if (options.loadError) return { data: null, error: options.loadError };
+                return { data: rows.slice(from, to + 1), error: null };
+              },
+              async insert(payloads, insertOptions) {
+                calls.inserts.push({ payloads, options: insertOptions });
+                if (options.insertError) return { data: null, error: options.insertError };
+                const payload = payloads[0];
+                if (rows.some(row => row.id === payload.id)) return { data: null, error: { code: "23505" } };
+                rows.push({ ...payload });
+                return { data: null, error: null };
+              }
+            };
+            return builder;
+          }
+        };
       };
 
       test("T1: exactly 205 questions exist", () => equal(cards.length, 205));
@@ -104,7 +168,7 @@
         app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 1, userId: null, responses: { [legacyEntry[0]]: response("almost") } }));
         equal(api.migrateProgressRecord().status, "migrated");
         const saved = JSON.parse(app.localStorage.getItem(api.PROGRESS_KEY));
-        equal([saved.schemaVersion, saved.assessmentEvents[0].result], [4, "needs_review"]);
+        equal([saved.schemaVersion, saved.anonymous.assessmentEvents[0].result], [5, "needs_review"]);
       });
       test("T15: legacy session references migrate correctly", () => {
         app.localStorage.setItem(api.SESSION_KEY, JSON.stringify({ schemaVersion: 1, userId: null, topic: "All", cardIds: [legacyEntry[0]], responses: { [legacyEntry[0]]: response("knew_it") } }));
@@ -128,16 +192,20 @@
       });
       test("T18: malformed persisted data does not crash migration", () => {
         app.localStorage.setItem(api.PROGRESS_KEY, "{broken");
-        equal(api.migrateProgressRecord().status, "not_found");
+        equal(api.migrateProgressRecord().status, "unsupported_or_malformed");
+        equal(app.localStorage.getItem(api.PROGRESS_KEY), "{broken");
       });
       test("T19: valid current-version records load correctly", () => {
         const event = eventRecord(ids[0], "known");
-        app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 4, userId: null, assessmentEvents: [event] }));
-        equal(api.loadProgress().assessmentEvents[0].result, "known");
+        const state = syncApi.createEmptyLocalState();
+        state.anonymous.assessmentEvents.push(event);
+        state.anonymous.revision = 1;
+        app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify(state));
+        equal(api.loadProgress().anonymous.assessmentEvents[0].result, "known");
       });
       test("T20: corrupted records fall back safely", () => {
         app.localStorage.setItem(api.PROGRESS_KEY, "not-json");
-        equal(api.loadProgress(), { schemaVersion: 4, userId: null, assessmentEvents: [] });
+        equal(api.loadProgress(), syncApi.createEmptyLocalState());
       });
       test("T21: every topic has an explicit stable ID", () => assert(api.TOPICS.every(topic => topic.id && topic.name)));
       test("T22: topic IDs are unique", () => equal(new Set(api.TOPICS.map(topic => topic.id)).size, api.TOPICS.length));
@@ -163,7 +231,7 @@
         equal(api.migrateProgressRecord().status, "migrated");
         equal(api.migrateSessionRecord().status, "migrated");
         const loaded = api.loadSession();
-        equal([api.loadProgress().assessmentEvents[0].result, loaded.topicId, loaded.responses[ids[0]].result], ["known", topic.id, "needs_review"]);
+        equal([api.loadProgress().anonymous.assessmentEvents[0].result, loaded.topicId, loaded.responses[ids[0]].result], ["known", topic.id, "needs_review"]);
       });
       test("T30: card UI enforces reveal and suppresses a repeated click", () => {
         const id = ids[0];
@@ -219,13 +287,15 @@
       test("T36: current history survives a repository reload", () => {
         const event = eventRecord(ids[0], "known", "session_reload");
         app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 4, userId: null, assessmentEvents: [event] }));
-        equal(api.loadProgress().assessmentEvents, [event]);
+        api.migrateProgressRecord();
+        equal(api.loadProgress().anonymous.assessmentEvents, [event]);
       });
       test("T37: malformed and unknown-question history fails safely", () => {
         const unknown = { id: "unknown_event", questionId: "q_unknown", sessionId: null, result: "known", assessedAt: stamp };
         app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 4, assessmentEvents: [null, unknown, { id: "broken" }] }));
+        api.migrateProgressRecord();
         const loaded = api.loadProgress();
-        equal(loaded.assessmentEvents, []);
+        equal(loaded.anonymous.assessmentEvents, []);
         equal(loaded.unmappedAssessmentEvents.length, 3);
       });
       test("T38: repository rejects a duplicate event ID", () => {
@@ -242,7 +312,7 @@
         const second = eventRecord(ids[0], "known", "session_second", "2026-01-02T00:00:00.000Z");
         assert(api.assessmentHistoryRepository.append(first));
         assert(api.assessmentHistoryRepository.append(second));
-        const reloaded = api.loadProgress().assessmentEvents.filter(event => event.id === first.id || event.id === second.id);
+        const reloaded = api.loadProgress().anonymous.assessmentEvents.filter(event => event.id === first.id || event.id === second.id);
         equal(reloaded.map(event => event.id), [first.id, second.id]);
         api.progress.assessmentEvents.splice(originalLength);
       });
@@ -251,14 +321,14 @@
         app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 3, userId: null, responses: { [ids[0]]: legacy } }));
         equal(api.migrateProgressRecord().status, "migrated");
         const saved = JSON.parse(app.localStorage.getItem(api.PROGRESS_KEY));
-        equal([saved.assessmentEvents.length, saved.assessmentEvents[0].questionId, saved.assessmentEvents[0].result], [1, ids[0], "known"]);
+        equal([saved.anonymous.assessmentEvents.length, saved.anonymous.assessmentEvents[0].questionId, saved.anonymous.assessmentEvents[0].result], [1, ids[0], "known"]);
       });
       test("T41: migration does not invent a timestamp for incomplete legacy data", () => {
         app.localStorage.setItem(api.PROGRESS_KEY, JSON.stringify({ schemaVersion: 3, responses: { [ids[0]]: { questionId: ids[0], result: "known" } } }));
         const report = api.migrateProgressRecord();
         const saved = JSON.parse(app.localStorage.getItem(api.PROGRESS_KEY));
         equal(report.unknown, [ids[0]]);
-        equal(saved.assessmentEvents, []);
+        equal(saved.anonymous.assessmentEvents, []);
         equal(saved.unmappedLegacyResponses[ids[0]].result, "known");
       });
       test("T42: failed history persistence does not record the UI assessment", () => {
@@ -633,6 +703,302 @@
         assert(!button.disabled);
         equal(button.querySelector("span:last-child").textContent, "Continue with Google");
         assert(app.document.getElementById("auth-message").textContent.includes("could not be started"));
+      });
+
+      test("T87: schema-4 history migrates to the anonymous schema-5 bucket", () => {
+        const events = [eventRecord(ids[0], "known"), eventRecord(ids[1], "needs_review")];
+        const source = JSON.stringify(schema4Record(events));
+        const storage = memoryStorage({ progress: source });
+        const result = syncApi.migrateSchema4To5({ storage, progressKey: "progress", stagingKey: "staging" });
+        equal([result.status, result.state.schemaVersion, result.state.domainMigrationVersion], ["migrated", 5, 4]);
+        equal(result.state.anonymous.assessmentEvents, events);
+        equal(storage.readRaw("staging"), null);
+      });
+
+      test("T88: schema-5 migration is idempotent", () => {
+        const source = JSON.stringify(schema4Record([eventRecord(ids[0], "known")]));
+        const storage = memoryStorage({ progress: source });
+        syncApi.migrateSchema4To5({ storage, progressKey: "progress", stagingKey: "staging" });
+        const once = storage.readRaw("progress");
+        const twice = syncApi.migrateSchema4To5({ storage, progressKey: "progress", stagingKey: "staging" });
+        equal([twice.status, storage.readRaw("progress")], ["current", once]);
+      });
+
+      test("T89: interrupted staging write leaves schema-4 source untouched", () => {
+        const source = JSON.stringify(schema4Record([eventRecord(ids[0], "known")]));
+        const storage = memoryStorage({ progress: source }, key => key === "staging");
+        const result = syncApi.migrateSchema4To5({ storage, progressKey: "progress", stagingKey: "staging" });
+        equal([result.status, storage.readRaw("progress")], ["staging_write_failed", source]);
+      });
+
+      test("T90: failed final migration write preserves source and recoverable staging", () => {
+        const source = JSON.stringify(schema4Record([eventRecord(ids[0], "known")]));
+        const storage = memoryStorage({ progress: source }, key => key === "progress");
+        const result = syncApi.migrateSchema4To5({ storage, progressKey: "progress", stagingKey: "staging" });
+        equal([result.status, storage.readRaw("progress")], ["final_write_failed", source]);
+        assert(syncApi.validateLocalState(JSON.parse(storage.readRaw("staging"))));
+      });
+
+      test("T91: local repository rolls back in-memory append after storage failure", () => {
+        const storage = memoryStorage({}, key => key === "progress");
+        const repository = createLocalRepository(syncApi.createEmptyLocalState(), storage);
+        assert(!repository.append(syncApi.ANONYMOUS_OWNER, eventRecord(ids[0], "known")));
+        equal(repository.list(syncApi.ANONYMOUS_OWNER), []);
+      });
+
+      test("T92: anonymous assessment remains local and advances its revision", () => {
+        const repository = createLocalRepository();
+        const event = eventRecord(ids[0], "known");
+        assert(repository.append(syncApi.ANONYMOUS_OWNER, event));
+        equal(repository.list(syncApi.ANONYMOUS_OWNER), [event]);
+        equal([repository.snapshot().anonymous.revision, repository.pending("user_a").length], [1, 0]);
+      });
+
+      test("T93: authenticated owner buckets and pending queues are isolated", () => {
+        const repository = createLocalRepository();
+        const a = eventRecord(ids[0], "known");
+        const b = eventRecord(ids[1], "needs_review");
+        assert(repository.append("user_a", a, { pending: true }));
+        assert(repository.append("user_b", b, { pending: true }));
+        equal(repository.list("user_a"), [a]);
+        equal(repository.list("user_b"), [b]);
+        equal([repository.pending("user_a")[0].id, repository.pending("user_b")[0].id], [a.id, b.id]);
+      });
+
+      test("T94: anonymous import is durable, idempotent, and keeps the anonymous copy", () => {
+        const repository = createLocalRepository();
+        const event = eventRecord(ids[0], "known");
+        repository.append(syncApi.ANONYMOUS_OWNER, event);
+        const first = repository.claimAnonymous("user_a");
+        const second = repository.claimAnonymous("user_a");
+        equal([first.ok, first.claimed, second.claimed], [true, 1, 0]);
+        equal(repository.list(syncApi.ANONYMOUS_OWNER), [event]);
+        equal(repository.list("user_a"), [event]);
+        assert(!repository.shouldPromptClaim("user_a"));
+      });
+
+      test("T95: declining import is remembered until anonymous history changes", () => {
+        const repository = createLocalRepository();
+        repository.append(syncApi.ANONYMOUS_OWNER, eventRecord(ids[0], "known"));
+        assert(repository.shouldPromptClaim("user_a"));
+        assert(repository.declineAnonymous("user_a"));
+        assert(!repository.shouldPromptClaim("user_a"));
+        repository.append(syncApi.ANONYMOUS_OWNER, eventRecord(ids[1], "known"));
+        assert(repository.shouldPromptClaim("user_a"));
+      });
+
+      test("T96: remote insert omits user_id and preserves ID and timestamp", async () => {
+        const client = fakeSupabaseClient();
+        const repository = remoteApi.createRemoteAssessmentRepository(client);
+        const event = eventRecord(ids[0], "known", "session_remote", "2026-10-14T10:11:12.000Z");
+        equal((await repository.insertOwnEvent(event)).status, "inserted");
+        const payload = client.calls.inserts[0].payloads[0];
+        equal([payload.id, payload.question_id, payload.session_id, payload.result, payload.assessed_at], [event.id, ids[0], "session_remote", "known", event.assessedAt]);
+        assert(!Object.prototype.hasOwnProperty.call(payload, "user_id"));
+        equal(client.calls.inserts[0].options, { defaultToNull: false });
+      });
+
+      test("T97: remote load paginates and maps rows to canonical events", async () => {
+        const rows = [0, 1, 2, 3, 4].map(index => ({
+          id: `remote_${index}`,
+          question_id: ids[index],
+          session_id: null,
+          result: index % 2 ? "needs_review" : "known",
+          assessed_at: `2026-10-14T10:0${index}:00.000Z`
+        }));
+        const client = fakeSupabaseClient(rows);
+        const repository = remoteApi.createRemoteAssessmentRepository(client, { pageSize: 2 });
+        const loaded = await repository.loadOwnEvents();
+        equal([loaded.status, loaded.events.length, client.calls.ranges], ["loaded", 5, [[0, 1], [2, 3], [4, 5]]]);
+        equal(loaded.events[0].questionId, ids[0]);
+      });
+
+      test("T98: matching remote duplicate is accepted as already present", async () => {
+        const event = eventRecord(ids[0], "known", null, stamp);
+        const client = fakeSupabaseClient([remoteApi.toRemoteRow(event)]);
+        const repository = remoteApi.createRemoteAssessmentRepository(client);
+        equal((await repository.insertOwnEvent(event)).status, "already_present");
+      });
+
+      test("T99: same-ID different-payload duplicate is reported as a conflict", async () => {
+        const local = eventRecord(ids[0], "known", null, stamp);
+        const remote = { ...local, result: "needs_review" };
+        const client = fakeSupabaseClient([remoteApi.toRemoteRow(remote)]);
+        const repository = remoteApi.createRemoteAssessmentRepository(client);
+        const result = await repository.insertOwnEvent(local);
+        equal([result.status, result.remoteEvent.result], ["conflict", "needs_review"]);
+      });
+
+      test("T100: remote merge adds remote-only events and clears matching pending IDs", () => {
+        const repository = createLocalRepository();
+        const local = eventRecord(ids[0], "known");
+        const remote = eventRecord(ids[1], "needs_review");
+        repository.append("user_a", local, { pending: true });
+        const result = repository.mergeRemote("user_a", [local, remote]);
+        equal([result.ok, result.matched, result.added], [true, 1, 1]);
+        equal(repository.pending("user_a"), []);
+        equal(repository.list("user_a").map(event => event.id), [local.id, remote.id]);
+      });
+
+      test("T101: conflict quarantine preserves local and remote payloads without pending sync", () => {
+        const repository = createLocalRepository();
+        const local = eventRecord(ids[0], "known");
+        const remote = { ...local, result: "needs_review" };
+        repository.append("user_a", local, { pending: true });
+        const result = repository.mergeRemote("user_a", [remote]);
+        const conflict = repository.snapshot().users.user_a.conflicts[local.id];
+        equal([result.conflicts, conflict.localEvent.result, conflict.remoteEvent.result], [1, "known", "needs_review"]);
+        equal(repository.pending("user_a"), []);
+        equal(repository.list("user_a")[0].result, "needs_review");
+      });
+
+      test("T102: failed upload remains pending and a later retry reuses the event", async () => {
+        const repository = createLocalRepository();
+        const event = eventRecord(ids[0], "known");
+        repository.append("user_a", event, { pending: true });
+        let calls = 0;
+        const remote = {
+          loadOwnEvents: async () => ({ status: "loaded", events: [] }),
+          insertOwnEvent: async candidate => {
+            calls++;
+            equal(candidate, event);
+            return calls === 1 ? { status: "failed", errorCode: "network" } : { status: "inserted" };
+          }
+        };
+        const coordinator = syncApi.createSyncCoordinator({ localRepository: repository, remoteRepository: remote });
+        coordinator.activate("user_a");
+        equal((await coordinator.syncPending()).status, "waiting");
+        equal(repository.pending("user_a"), [event]);
+        equal((await coordinator.syncPending()).status, "saved");
+        equal([calls, repository.pending("user_a").length], [2, 0]);
+      });
+
+      test("T103: concurrent synchronization calls share one flight", async () => {
+        const repository = createLocalRepository();
+        const event = eventRecord(ids[0], "known");
+        repository.append("user_a", event, { pending: true });
+        let calls = 0;
+        let release;
+        const gate = new Promise(resolve => { release = resolve; });
+        const remote = { loadOwnEvents: async () => ({ status: "loaded", events: [] }), insertOwnEvent: async () => { calls++; await gate; return { status: "inserted" }; } };
+        const coordinator = syncApi.createSyncCoordinator({ localRepository: repository, remoteRepository: remote });
+        coordinator.activate("user_a");
+        const first = coordinator.syncPending();
+        const second = coordinator.syncPending();
+        release();
+        await Promise.all([first, second]);
+        equal(calls, 1);
+      });
+
+      test("T104: remote restoration merges history and updates only the active owner", async () => {
+        const repository = createLocalRepository();
+        const remoteEvent = eventRecord(ids[0], "known");
+        let changed = null;
+        const remote = { loadOwnEvents: async () => ({ status: "loaded", events: [remoteEvent] }), insertOwnEvent: async () => ({ status: "inserted" }) };
+        const coordinator = syncApi.createSyncCoordinator({ localRepository: repository, remoteRepository: remote, onHistoryChanged: userId => { changed = userId; } });
+        coordinator.activate("user_a");
+        await coordinator.restoreForUser("user_a");
+        equal([changed, repository.list("user_a")], ["user_a", [remoteEvent]]);
+        equal(repository.list(syncApi.ANONYMOUS_OWNER), []);
+      });
+
+      test("T105: stale remote restoration cannot modify a switched account", async () => {
+        const repository = createLocalRepository();
+        const event = eventRecord(ids[0], "known");
+        let release;
+        const deferred = new Promise(resolve => { release = resolve; });
+        const remote = { loadOwnEvents: () => deferred, insertOwnEvent: async () => ({ status: "inserted" }) };
+        const coordinator = syncApi.createSyncCoordinator({ localRepository: repository, remoteRepository: remote });
+        coordinator.activate("user_a");
+        const restoring = coordinator.restoreForUser("user_a");
+        coordinator.activate("user_b");
+        release({ status: "loaded", events: [event] });
+        equal((await restoring).status, "stale");
+        equal([repository.list("user_a"), repository.list("user_b")], [[], []]);
+      });
+
+      test("T106: sign-out activation leaves account history intact and anonymous separate", () => {
+        const repository = createLocalRepository();
+        const accountEvent = eventRecord(ids[0], "known");
+        const anonymousEvent = eventRecord(ids[1], "needs_review");
+        repository.append("user_a", accountEvent, { pending: true });
+        repository.append(syncApi.ANONYMOUS_OWNER, anonymousEvent);
+        const coordinator = syncApi.createSyncCoordinator({ localRepository: repository, remoteRepository: { loadOwnEvents: async () => ({ status: "loaded", events: [] }), insertOwnEvent: async () => ({ status: "inserted" }) } });
+        coordinator.activate("user_a");
+        coordinator.activate(null);
+        equal(repository.list("user_a"), [accountEvent]);
+        equal(repository.list(syncApi.ANONYMOUS_OWNER), [anonymousEvent]);
+      });
+
+      test("T107: equal timestamps use event-ID ordering consistently for Progress and Weak Areas", () => {
+        const earlierId = { id: "event_a", questionId: ids[0], sessionId: null, result: "known", assessedAt: stamp };
+        const laterId = { id: "event_z", questionId: ids[0], sessionId: null, result: "needs_review", assessedAt: stamp };
+        const forward = [earlierId, laterId];
+        const reverse = [laterId, earlierId];
+        equal(api.deriveQuestionProgress(forward, ids[0]).currentStatus, "needs_review");
+        equal(api.deriveQuestionProgress(reverse, ids[0]).currentStatus, "needs_review");
+        equal(api.getWeakQuestions(cards, forward).map(api.cardId), api.getWeakQuestions(cards, reverse).map(api.cardId));
+        equal(api.deriveOverallProgress(cards, forward), api.deriveOverallProgress(cards, reverse));
+      });
+
+      test("T108: unknown remote question IDs are preserved but excluded from progress", () => {
+        const repository = createLocalRepository();
+        const unknown = { id: "rls_test_unknown", questionId: "rls_test_question_not_content", sessionId: null, result: "known", assessedAt: stamp };
+        assert(repository.mergeRemote("user_a", [unknown]).ok);
+        equal(repository.list("user_a"), [unknown]);
+        equal(api.deriveOverallProgress(cards, repository.list("user_a")).questionsPracticed, 0);
+        equal(api.getWeakQuestions(cards, repository.list("user_a")), []);
+      });
+
+      test("T109: pending state survives repository recreation", () => {
+        const storage = memoryStorage();
+        const first = createLocalRepository(syncApi.createEmptyLocalState(), storage);
+        const event = eventRecord(ids[0], "known");
+        first.append("user_a", event, { pending: true });
+        const second = createLocalRepository(JSON.parse(storage.readRaw("progress")), storage);
+        equal(second.pending("user_a"), [event]);
+      });
+
+      test("T110: remote fetch failure does not erase local account history", async () => {
+        const repository = createLocalRepository();
+        const event = eventRecord(ids[0], "known");
+        repository.append("user_a", event, { pending: false });
+        const remote = { loadOwnEvents: async () => ({ status: "failed", events: [], errorCode: "network" }), insertOwnEvent: async () => ({ status: "failed" }) };
+        const coordinator = syncApi.createSyncCoordinator({ localRepository: repository, remoteRepository: remote });
+        coordinator.activate("user_a");
+        equal((await coordinator.restoreForUser("user_a")).status, "failed");
+        equal(repository.list("user_a"), [event]);
+      });
+
+      test("T111: configured auth context shares one client with auth and persistence composition", async () => {
+        const originalLibrary = app.supabase;
+        const fake = fakeAuthClient().client;
+        let created = 0;
+        app.supabase = { createClient: () => { created++; return fake; } };
+        try {
+          const context = await authApi.createConfiguredAuthContext({ supabaseUrl: "https://project.supabase.co", supabasePublishableKey: "public_key" });
+          assert(context.client === fake);
+          equal([created, context.authService.getState().status], [1, "loading"]);
+        } finally {
+          if (originalLibrary === undefined) delete app.supabase;
+          else app.supabase = originalLibrary;
+        }
+      });
+
+      test("T112: malformed remote rows are ignored without losing valid rows", async () => {
+        const valid = remoteApi.toRemoteRow(eventRecord(ids[0], "known"));
+        const client = fakeSupabaseClient([valid, { id: "broken_remote" }]);
+        const repository = remoteApi.createRemoteAssessmentRepository(client, { pageSize: 5 });
+        const loaded = await repository.loadOwnEvents();
+        equal([loaded.status, loaded.events.length, loaded.events[0].questionId], ["loaded", 1, ids[0]]);
+      });
+
+      test("T113: import confirmation and minimal sync status UI are present", () => {
+        const dialog = app.document.getElementById("claim-dialog");
+        assert(dialog.textContent.includes("Bring your practice progress into this account?"));
+        equal(app.document.getElementById("claim-import").textContent, "Import progress");
+        equal(app.document.getElementById("claim-decline").textContent, "Not now");
+        assert(app.document.getElementById("sync-status").hidden);
       });
 
       let passed = 0;

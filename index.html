@@ -146,6 +146,10 @@
   .auth-helper { margin-top: -3px; font-size: 12px; }
   .auth-message { min-height: 1.4em; margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
   .auth-message.error { color: #ffb4a8; }
+  .sync-status { color: var(--muted); font: 11px var(--font-mono); }
+  .sync-status[data-state="saved"] { color: var(--teal); }
+  .sync-status[data-state="waiting"], .sync-status[data-state="failed"] { color: var(--amber); }
+  .claim-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
   .auth-success {
     margin-top: 24px;
     padding: 18px;
@@ -772,6 +776,7 @@
   <header>
     <div class="account-bar" aria-live="polite">
       <span id="auth-status">Checking sign-in status…</span>
+      <span class="sync-status" id="sync-status" hidden></span>
       <button class="account-button" id="auth-open" type="button" hidden>Sign In</button>
       <button class="account-button" id="auth-signout" type="button" hidden>Sign Out</button>
     </div>
@@ -811,6 +816,19 @@
         <button class="session-button secondary auth-change-email" id="auth-change-email" type="button">Use a different email</button>
       </div>
       <p class="auth-message" id="auth-message" role="status"></p>
+    </div>
+  </dialog>
+
+  <dialog class="auth-dialog" id="claim-dialog" aria-labelledby="claim-heading">
+    <div class="auth-dialog-content">
+      <p class="auth-welcome">Practice history found</p>
+      <h2 id="claim-heading">Bring your practice progress into this account?</h2>
+      <p class="session-copy">You have existing practice history on this device. Importing keeps the local anonymous copy and securely adds eligible assessments to this account.</p>
+      <div class="claim-actions">
+        <button class="session-button primary" id="claim-import" type="button">Import progress</button>
+        <button class="session-button secondary" id="claim-decline" type="button">Not now</button>
+      </div>
+      <p class="auth-message" id="claim-message" role="status"></p>
     </div>
   </dialog>
 
@@ -903,6 +921,8 @@
 
 <script src="auth-config.js"></script>
 <script src="auth-service.js"></script>
+<script src="learning-sync.js"></script>
+<script src="remote-assessment-repository.js"></script>
 <script>
 /**
  * @typedef {"known" | "needs_review"} AssessmentResult
@@ -910,7 +930,8 @@
  * @typedef {{ questionId: string, latestResult: AssessmentResult | null, currentStatus: AssessmentResult | null, lastReviewedAt: string | null, timesAssessed: number, timesKnown: number, timesNeedsReview: number }} DerivedQuestionProgress
  * @typedef {{ id: string, name: string, className: string }} Topic
  * @typedef {{ id: string, topicId: string, cat: string, q: string, body: string, src: string, url: string }} Question
- * @typedef {{ schemaVersion: 4, userId: null | string, assessmentEvents: AssessmentEvent[], unmappedLegacyResponses?: Object<string, object>, unmappedAssessmentEvents?: object[] }} ProgressState
+ * @typedef {{ assessmentEvents: AssessmentEvent[], pendingEventIds: string[], conflicts: Object<string, object> }} UserProgressBucket
+ * @typedef {{ schemaVersion: 5, domainMigrationVersion: 4, anonymous: { revision: number, assessmentEvents: AssessmentEvent[], conflicts: Object<string, object> }, users: Object<string, UserProgressBucket>, claimDecisions: Object<string, object> }} ProgressState
  * @typedef {{
  *   schemaVersion: 4,
  *   userId: null | string,
@@ -5104,16 +5125,26 @@ const countEl = document.getElementById("count");
 document.getElementById("total").textContent = CARDS.length;
 
 const PROGRESS_KEY = "aiml-interview-deck-progress";
+const PROGRESS_STAGING_KEY = "aiml-interview-deck-progress-v5-staging";
 const SESSION_KEY = "aiml-interview-deck-session";
 const MIGRATION_STATE_KEY = "aiml-interview-deck-migrations";
 const QUESTION_ID_MIGRATION_VERSION = 1;
-const DOMAIN_MIGRATION_VERSION = 3;
-const PERSISTENCE_SCHEMA_VERSION = 4;
+const DOMAIN_MIGRATION_VERSION = AIMLLearningSync.DOMAIN_MIGRATION_VERSION;
+const PERSISTENCE_SCHEMA_VERSION = AIMLLearningSync.LOCAL_SCHEMA_VERSION;
+const SESSION_SCHEMA_VERSION = 4;
 
 const storageRepository = {
+  readRaw(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (error) {
+      console.warn(`Saved data for ${key} could not be loaded:`, error);
+      return null;
+    }
+  },
   read(key) {
     try {
-      const value = localStorage.getItem(key);
+      const value = this.readRaw(key);
       return value === null ? null : JSON.parse(value);
     } catch (error) {
       console.warn(`Saved data for ${key} could not be loaded:`, error);
@@ -5121,8 +5152,11 @@ const storageRepository = {
     }
   },
   write(key, value) {
+    return this.writeRaw(key, JSON.stringify(value));
+  },
+  writeRaw(key, value) {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(key, value);
       return true;
     } catch (error) {
       console.warn(`Data for ${key} could not be saved:`, error);
@@ -5230,44 +5264,62 @@ function migrateResponseKeys(responses, sessionId = null, idPrefix = "migrated_p
 }
 
 function migrateProgressRecord() {
+  const sourceRaw = storageRepository.readRaw(PROGRESS_KEY);
+  if (sourceRaw === null) return { status: "not_found", mapped: 0, unknown: [], state: AIMLLearningSync.createEmptyLocalState() };
   const saved = storageRepository.read(PROGRESS_KEY);
-  if (!saved) return { status: "not_found", mapped: 0, unknown: [] };
-  if (saved.schemaVersion === PERSISTENCE_SCHEMA_VERSION) {
-    return { status: "current", mapped: Array.isArray(saved.assessmentEvents) ? saved.assessmentEvents.length : 0, unknown: [] };
-  }
-  if (![1, 2, 3].includes(saved.schemaVersion) || !saved.responses || typeof saved.responses !== "object") {
-    return { status: "unsupported_or_malformed", mapped: 0, unknown: [] };
+  if (!saved) return { status: "unsupported_or_malformed", mapped: 0, unknown: [], state: null };
+  let schema4Source = null;
+  let unknown = [];
+  if (saved.schemaVersion === 4 && Array.isArray(saved.assessmentEvents)) {
+    const validEvents = [];
+    const seen = new Set();
+    const rejected = [...(Array.isArray(saved.unmappedAssessmentEvents) ? saved.unmappedAssessmentEvents : [])];
+    saved.assessmentEvents.forEach(event => {
+      if (!isValidAssessmentEvent(event) || seen.has(event.id)) rejected.push(event);
+      else { seen.add(event.id); validEvents.push(event); }
+    });
+    schema4Source = { ...saved, assessmentEvents: validEvents };
+    if (rejected.length) schema4Source.unmappedAssessmentEvents = rejected;
+  } else if ([1, 2, 3].includes(saved.schemaVersion) && saved.responses && typeof saved.responses === "object") {
+    const responseMigration = migrateResponseKeys(saved.responses);
+    unknown = Object.keys(responseMigration.unknown);
+    const unmappedLegacyResponses = {
+      ...(saved.unmappedLegacyResponses || {}),
+      ...responseMigration.unknown
+    };
+    schema4Source = {
+      ...saved,
+      schemaVersion: 4,
+      questionIdMigrationVersion: QUESTION_ID_MIGRATION_VERSION,
+      domainMigrationVersion: 3,
+      assessmentEvents: Object.values(responseMigration.migrated)
+    };
+    delete schema4Source.responses;
+    if (Object.keys(unmappedLegacyResponses).length) {
+      schema4Source.unmappedLegacyResponses = unmappedLegacyResponses;
+      console.warn("Some legacy progress references could not be mapped and were retained for recovery:", unknown);
+    }
+  } else if (saved.schemaVersion !== PERSISTENCE_SCHEMA_VERSION) {
+    return { status: "unsupported_or_malformed", mapped: 0, unknown: [], state: null };
   }
 
-  const { migrated, unknown } = migrateResponseKeys(saved.responses);
-  const unmappedLegacyResponses = {
-    ...(saved.unmappedLegacyResponses || {}),
-    ...unknown
-  };
-  const upgraded = {
-    ...saved,
-    schemaVersion: PERSISTENCE_SCHEMA_VERSION,
-    questionIdMigrationVersion: QUESTION_ID_MIGRATION_VERSION,
-    domainMigrationVersion: DOMAIN_MIGRATION_VERSION,
-    assessmentEvents: Object.values(migrated)
-  };
-  delete upgraded.responses;
-  if (Object.keys(unmappedLegacyResponses).length) {
-    upgraded.unmappedLegacyResponses = unmappedLegacyResponses;
-    console.warn("Some legacy progress references could not be mapped and were retained for recovery:", Object.keys(unknown));
-  }
-  storageRepository.write(PROGRESS_KEY, upgraded);
+  const migration = AIMLLearningSync.migrateSchema4To5({
+    storage: storageRepository,
+    progressKey: PROGRESS_KEY,
+    stagingKey: PROGRESS_STAGING_KEY,
+    sourceRecord: schema4Source
+  });
   return {
-    status: "migrated",
-    mapped: upgraded.assessmentEvents.length,
-    unknown: Object.keys(unknown)
+    ...migration,
+    mapped: migration.state?.anonymous?.assessmentEvents?.length || 0,
+    unknown
   };
 }
 
 function migrateSessionRecord() {
   const saved = storageRepository.read(SESSION_KEY);
   if (!saved) return { status: "not_found", mapped: 0, unknown: [] };
-  if (saved.schemaVersion === PERSISTENCE_SCHEMA_VERSION) {
+  if (saved.schemaVersion === SESSION_SCHEMA_VERSION) {
     return { status: "current", mapped: saved.cardIds?.length || 0, unknown: [] };
   }
   if (![1, 2, 3].includes(saved.schemaVersion) || !Array.isArray(saved.cardIds) ||
@@ -5293,7 +5345,7 @@ function migrateSessionRecord() {
 
   const upgraded = {
     ...saved,
-    schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+    schemaVersion: SESSION_SCHEMA_VERSION,
     questionIdMigrationVersion: QUESTION_ID_MIGRATION_VERSION,
     domainMigrationVersion: DOMAIN_MIGRATION_VERSION,
     topicId,
@@ -5305,11 +5357,17 @@ function migrateSessionRecord() {
   return { status: "migrated", mapped: resolvedCardIds.length, unknown: [] };
 }
 
+let inMemoryProgressMigrationState = null;
+
 function runQuestionIdMigration() {
+  const progressMigration = migrateProgressRecord();
+  inMemoryProgressMigrationState = progressMigration.state || null;
+  const { state: _progressState, ...progressReport } = progressMigration;
   const report = {
     migrationVersion: DOMAIN_MIGRATION_VERSION,
     ranAt: new Date().toISOString(),
-    progress: migrateProgressRecord(),
+    complete: ["not_found", "current", "migrated"].includes(progressMigration.status),
+    progress: progressReport,
     session: migrateSessionRecord()
   };
   storageRepository.write(MIGRATION_STATE_KEY, report);
@@ -5321,53 +5379,52 @@ validateTopicIdentity();
 const questionIdMigration = runQuestionIdMigration();
 
 function isValidAssessmentEvent(event) {
-  return Boolean(event && typeof event.id === "string" && event.id && cardsById.has(event.questionId) &&
-    ASSESSMENT_RESULT_VALUES.has(event.result) && !Number.isNaN(Date.parse(event.assessedAt)));
+  return AIMLLearningSync.isStoredAssessmentEvent(event) && cardsById.has(event.questionId);
 }
 
 function loadProgress() {
-  const empty = { schemaVersion: PERSISTENCE_SCHEMA_VERSION, userId: null, assessmentEvents: [] };
+  const empty = AIMLLearningSync.createEmptyLocalState();
   const saved = storageRepository.read(PROGRESS_KEY);
-  if (saved && saved.schemaVersion === PERSISTENCE_SCHEMA_VERSION && Array.isArray(saved.assessmentEvents)) {
-    const seen = new Set();
-    const assessmentEvents = [];
-    const rejected = [...(Array.isArray(saved.unmappedAssessmentEvents) ? saved.unmappedAssessmentEvents : [])];
-    saved.assessmentEvents.forEach(event => {
-      if (!isValidAssessmentEvent(event) || seen.has(event.id)) {
-        rejected.push(event);
-        return;
-      }
-      seen.add(event.id);
-      assessmentEvents.push(event);
-    });
-    const loaded = { ...empty, ...saved, assessmentEvents };
-    if (rejected.length) loaded.unmappedAssessmentEvents = rejected;
-    return loaded;
-  }
+  if (AIMLLearningSync.validateLocalState(saved)) return saved;
+  if (AIMLLearningSync.validateLocalState(inMemoryProgressMigrationState)) return inMemoryProgressMigrationState;
   return empty;
 }
 
-const progress = loadProgress();
+const localAssessmentRepository = AIMLLearningSync.createLocalAssessmentRepository({
+  storage: storageRepository,
+  progressKey: PROGRESS_KEY,
+  initialState: loadProgress(),
+  isSyncEligibleEvent: isValidAssessmentEvent
+});
+let activeProgressOwner = AIMLLearningSync.ANONYMOUS_OWNER;
+const progress = { schemaVersion: PERSISTENCE_SCHEMA_VERSION, userId: null, assessmentEvents: [] };
+
+function refreshActiveProgress(ownerKey = activeProgressOwner) {
+  activeProgressOwner = ownerKey || AIMLLearningSync.ANONYMOUS_OWNER;
+  progress.userId = activeProgressOwner === AIMLLearningSync.ANONYMOUS_OWNER ? null : activeProgressOwner;
+  progress.assessmentEvents.splice(0, progress.assessmentEvents.length, ...localAssessmentRepository.list(activeProgressOwner));
+  return progress;
+}
+
+refreshActiveProgress();
 
 const assessmentHistoryRepository = {
-  append(event) {
-    if (!isValidAssessmentEvent(event) || progress.assessmentEvents.some(existing => existing.id === event.id)) return false;
-    progress.assessmentEvents.push(event);
-    if (!storageRepository.write(PROGRESS_KEY, progress)) {
-      progress.assessmentEvents.pop();
-      return false;
-    }
-    return true;
+  append(event, ownerKey = activeProgressOwner) {
+    const saved = localAssessmentRepository.append(ownerKey, event, {
+      pending: ownerKey !== AIMLLearningSync.ANONYMOUS_OWNER
+    });
+    if (saved && ownerKey === activeProgressOwner) refreshActiveProgress(ownerKey);
+    return saved;
   },
-  all() {
-    return [...progress.assessmentEvents];
+  all(ownerKey = activeProgressOwner) {
+    return localAssessmentRepository.list(ownerKey);
   }
 };
 
 function deriveQuestionProgress(events, questionId) {
   const valid = (Array.isArray(events) ? events : [])
     .filter(event => isValidAssessmentEvent(event) && event.questionId === questionId)
-    .sort((left, right) => recordTimestamp(left) - recordTimestamp(right));
+    .sort(AIMLLearningSync.compareAssessmentEvents);
   const latest = valid[valid.length - 1] || null;
   return {
     questionId,
@@ -5430,7 +5487,12 @@ function cardId(c) {
 }
 
 function saveAssessment(event) {
-  return assessmentHistoryRepository.append(event);
+  const ownerKey = activeProgressOwner;
+  const saved = assessmentHistoryRepository.append(event, ownerKey);
+  if (saved && ownerKey !== AIMLLearningSync.ANONYMOUS_OWNER && syncCoordinator) {
+    void syncCoordinator.syncPending(ownerKey);
+  }
+  return saved;
 }
 
 const sessionPanel = document.getElementById("session-panel");
@@ -5458,7 +5520,7 @@ function availableTopics() {
 
 function loadSession() {
   const saved = storageRepository.read(SESSION_KEY);
-  if (!saved || saved.schemaVersion !== PERSISTENCE_SCHEMA_VERSION || !Array.isArray(saved.cardIds)) return null;
+  if (!saved || saved.schemaVersion !== SESSION_SCHEMA_VERSION || !Array.isArray(saved.cardIds)) return null;
 
   const cardIds = [...new Set(saved.cardIds)].filter(id => cardsById.has(id));
   if (!cardIds.length) return null;
@@ -5483,6 +5545,8 @@ function loadSession() {
 let session = loadSession();
 let activeTopicId = "all";
 let advancing = false;
+const regressionTestMode = new URLSearchParams(window.location.search).has("regression-test");
+let learningContextLoading = !regressionTestMode && AIMLAuth.hasPublicAuthConfig(window.AIML_AUTH_CONFIG);
 
 function saveSession() {
   if (!session) return false;
@@ -5521,7 +5585,7 @@ function createSessionState({ sessionType, requestedLength, topicId, eligibleIds
 
   const now = new Date().toISOString();
   return {
-    schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+    schemaVersion: SESSION_SCHEMA_VERSION,
     userId: null,
     sessionId: `session_${Date.now().toString(36)}`,
     sessionType,
@@ -5566,8 +5630,18 @@ function refreshSessionLauncher() {
 }
 
 function renderProgress() {
+  if (learningContextLoading) {
+    progressEmpty.hidden = false;
+    progressEmpty.textContent = "Loading saved progress…";
+    progressMetrics.hidden = true;
+    topicProgress.hidden = true;
+    progressPracticeWeak.hidden = true;
+    topicProgress.innerHTML = "";
+    return null;
+  }
   const overall = deriveOverallProgress(CARDS, progress.assessmentEvents);
   const hasProgress = overall.questionsPracticed > 0;
+  progressEmpty.textContent = "Start practicing to build your progress.";
   progressEmpty.hidden = hasProgress;
   progressMetrics.hidden = !hasProgress;
   topicProgress.hidden = !hasProgress;
@@ -5889,7 +5963,16 @@ const authEmailForm = document.getElementById("auth-email-form");
 const authDefault = document.getElementById("auth-default");
 const authEmailSuccess = document.getElementById("auth-email-success");
 const authSentEmail = document.getElementById("auth-sent-email");
+const syncStatus = document.getElementById("sync-status");
+const claimDialog = document.getElementById("claim-dialog");
+const claimImport = document.getElementById("claim-import");
+const claimDecline = document.getElementById("claim-decline");
+const claimMessage = document.getElementById("claim-message");
 let authService = null;
+let remoteAssessmentRepository = null;
+let syncCoordinator = null;
+let currentLearningUserId = null;
+let authTransition = 0;
 
 function authRedirectUrl() {
   return `${window.location.origin}${window.location.pathname}`;
@@ -5930,6 +6013,71 @@ function renderAuthState(state) {
   }
 }
 
+function renderSyncState(state) {
+  const labels = {
+    loading: "Restoring progress…",
+    saving: "Saving…",
+    saved: "Saved",
+    waiting: "Waiting to sync",
+    failed: "Sync failed"
+  };
+  const visible = Boolean(currentLearningUserId && labels[state]);
+  syncStatus.hidden = !visible;
+  syncStatus.dataset.state = visible ? state : "";
+  syncStatus.textContent = visible ? labels[state] : "";
+}
+
+function closeClaimDialog() {
+  if (!claimDialog.hasAttribute("open")) return;
+  if (typeof claimDialog.close === "function") claimDialog.close();
+  else claimDialog.removeAttribute("open");
+}
+
+function showClaimDialog(userId) {
+  if (!userId || userId !== currentLearningUserId || !localAssessmentRepository.shouldPromptClaim(userId)) return;
+  claimMessage.textContent = "";
+  claimImport.disabled = false;
+  claimDecline.disabled = false;
+  if (typeof claimDialog.showModal === "function") claimDialog.showModal();
+  else claimDialog.setAttribute("open", "");
+}
+
+async function applyAuthLearningState(state) {
+  const identity = state?.identity || null;
+  if (state?.status === AIMLAuth.AUTH_STATES.loading) return;
+  if (state?.status === AIMLAuth.AUTH_STATES.authenticated && identity?.userId && syncCoordinator) {
+    if (currentLearningUserId === identity.userId && syncCoordinator.getActiveUserId() === identity.userId) return;
+    const transition = ++authTransition;
+    currentLearningUserId = identity.userId;
+    learningContextLoading = true;
+    syncCoordinator.activate(identity.userId);
+    refreshActiveProgress(identity.userId);
+    renderProgress();
+    closeAuthDialog();
+    await syncCoordinator.restoreForUser(identity.userId);
+    if (transition !== authTransition || currentLearningUserId !== identity.userId) return;
+    learningContextLoading = false;
+    refreshActiveProgress(identity.userId);
+    renderProgress();
+    showClaimDialog(identity.userId);
+    return;
+  }
+  if (state?.status === AIMLAuth.AUTH_STATES.error && identity?.userId) return;
+  ++authTransition;
+  currentLearningUserId = null;
+  learningContextLoading = false;
+  if (syncCoordinator) syncCoordinator.activate(null);
+  refreshActiveProgress(AIMLLearningSync.ANONYMOUS_OWNER);
+  closeClaimDialog();
+  renderSyncState("idle");
+  renderProgress();
+}
+
+function handleAuthState(state) {
+  renderAuthState(state);
+  void applyAuthLearningState(state);
+}
+
 function showAuthDialog() {
   authMessage.className = "auth-message";
   authMessage.textContent = "";
@@ -5961,11 +6109,23 @@ function closeAuthDialog() {
 async function initializeAuthentication() {
   const config = window.AIML_AUTH_CONFIG;
   if (!AIMLAuth.hasPublicAuthConfig(config)) {
-    renderAuthState({ status: AIMLAuth.AUTH_STATES.anonymous, identity: null, error: null });
+    handleAuthState({ status: AIMLAuth.AUTH_STATES.anonymous, identity: null, error: null });
     return null;
   }
   try {
-    authService = await AIMLAuth.createConfiguredAuthService(config, { onChange: renderAuthState });
+    const context = await AIMLAuth.createConfiguredAuthContext(config, { onChange: handleAuthState });
+    authService = context.authService;
+    remoteAssessmentRepository = AIMLRemoteAssessments.createRemoteAssessmentRepository(context.client);
+    syncCoordinator = AIMLLearningSync.createSyncCoordinator({
+      localRepository: localAssessmentRepository,
+      remoteRepository: remoteAssessmentRepository,
+      onStatus: renderSyncState,
+      onHistoryChanged(userId) {
+        if (userId !== currentLearningUserId) return;
+        refreshActiveProgress(userId);
+        renderProgress();
+      }
+    });
     await authService.initialize();
     if (hasAuthCallbackError(window.location.href)) {
       showAuthDialog();
@@ -5975,7 +6135,7 @@ async function initializeAuthentication() {
     }
   } catch (error) {
     console.warn("Authentication initialization failed; local study remains available.", error);
-    renderAuthState({ status: AIMLAuth.AUTH_STATES.error, identity: null, error });
+    handleAuthState({ status: AIMLAuth.AUTH_STATES.error, identity: null, error });
   }
   return authService;
 }
@@ -6045,12 +6205,45 @@ authSignOut.addEventListener("click", async () => {
   }
 });
 
+claimImport.addEventListener("click", async () => {
+  const userId = currentLearningUserId;
+  if (!userId || !syncCoordinator) return;
+  claimImport.disabled = true;
+  claimDecline.disabled = true;
+  claimMessage.textContent = "Importing your practice history…";
+  const result = await syncCoordinator.claimAndSyncAnonymous(userId);
+  if (currentLearningUserId !== userId) return;
+  if (result.errorCode === "local_write_failed") {
+    claimMessage.textContent = "Your local history could not be updated. Nothing was uploaded; please try again.";
+    claimImport.disabled = false;
+    claimDecline.disabled = false;
+    return;
+  }
+  refreshActiveProgress(userId);
+  renderProgress();
+  closeClaimDialog();
+});
+
+claimDecline.addEventListener("click", () => {
+  const userId = currentLearningUserId;
+  if (!userId) return;
+  if (!localAssessmentRepository.declineAnonymous(userId)) {
+    claimMessage.textContent = "Your choice could not be saved. Please try again.";
+    return;
+  }
+  closeClaimDialog();
+});
+
+window.addEventListener("online", () => {
+  if (currentLearningUserId && syncCoordinator) void syncCoordinator.syncPending(currentLearningUserId);
+});
+
 populateSessionTopics();
 render();
 if (session?.status === "completed") showSummary();
 else showDeck();
-if (new URLSearchParams(window.location.search).has("regression-test")) {
-  renderAuthState({ status: AIMLAuth.AUTH_STATES.anonymous, identity: null, error: null });
+if (regressionTestMode) {
+  handleAuthState({ status: AIMLAuth.AUTH_STATES.anonymous, identity: null, error: null });
 } else {
   initializeAuthentication();
 }

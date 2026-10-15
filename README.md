@@ -14,6 +14,8 @@ boundaries, known risks, and the recommended next iteration.
 index.html          The full app (deck + styles + logic)
 auth-service.js     Provider-neutral identity boundary and Supabase adapter
 auth-config.js      Browser-safe public authentication configuration
+learning-sync.js    Schema-5 local history, merge, claim, and sync coordinator
+remote-assessment-repository.js  Supabase assessment-event repository
 ARCHITECTURE.md      Current architecture, boundaries, and migration plan
 manifest.json       PWA metadata (name, icons, colors)
 sw.js               Service worker — caches the app for offline use
@@ -90,7 +92,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
 
 The runner starts a temporary loopback-only static server and uses the installed
 Microsoft Edge JavaScript runtime. It does not install packages or access the
-internet. The 86 tests cover the 205 immutable question IDs, stable topic IDs,
+internet. The 113 tests cover the 205 immutable question IDs, stable topic IDs,
 canonical assessment semantics, reveal and duplicate guards, Quick and Full
 session selection, result calculation, multi-session assessment history, derived
 status and counters, reload persistence, legacy ID and storage-schema migration,
@@ -101,7 +103,11 @@ Overall and topic progress tests cover unique practiced questions, current-statu
 changes, percentage rounding, invalid history, and session-result separation.
 Authentication tests use a fake provider to cover loading, anonymous,
 authenticated, error, restoration, sign-out, stable identity, and preservation of
-local learning data without network access.
+local learning data without network access. Schema-5 and synchronization tests use
+in-memory storage and mocked Supabase responses to cover safe migration,
+interruption, account isolation, anonymous import decisions, remote pagination,
+duplicate and conflict handling, retries, stale responses, and deterministic
+local/cloud merging.
 The test page loads the real `index.html`, so these checks execute the production
 functions and production card data.
 
@@ -138,9 +144,10 @@ In Supabase Authentication:
    public use; Supabase's default sender is only for limited team-member testing.
 
 Magic links use the current page URL as their return location. First-time and
-returning email users use the same passwordless form. Authentication creates an
-account identity only; learning history is
-still stored solely in the current browser and is not yet synchronized.
+returning email users use the same passwordless form. Anonymous learning history
+stays local until the user explicitly imports it after sign-in. Authenticated
+assessment events are saved locally first and synchronized to the RLS-protected
+`public.assessment_events` table. Active session position remains local-only.
 Netlify needs no special callback function or rewrite while the application stays
 at the site root; its exact HTTPS site URL must simply be in Supabase's redirect
 allow list.
