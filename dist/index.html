@@ -305,6 +305,52 @@
   }
   .topic-progress-row b { color: var(--light); font-weight: 600; }
   .topic-progress-row span:last-child { text-align: right; }
+  .learning-history-status {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 9px;
+    margin-top: 14px;
+    padding-top: 13px;
+    border-top: 1px solid var(--panel-line);
+  }
+  .learning-history-icon {
+    width: 8px;
+    height: 8px;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.08);
+  }
+  .learning-history-status[data-state="saved"] .learning-history-icon,
+  .learning-history-status[data-state="empty"] .learning-history-icon { background: var(--teal); }
+  .learning-history-status[data-state="loading"] .learning-history-icon,
+  .learning-history-status[data-state="saving"] .learning-history-icon { background: var(--amber); }
+  .learning-history-status[data-state="problem"] .learning-history-icon { background: #ff9b8b; }
+  .learning-history-copy { min-width: 0; }
+  .learning-history-copy strong {
+    display: block;
+    color: var(--light);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .learning-history-copy p {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .learning-history-signin {
+    align-self: center;
+    padding: 2px 0;
+    border: 0;
+    background: transparent;
+    color: var(--teal);
+    font: 600 12px var(--font-sans);
+    cursor: pointer;
+  }
+  .learning-history-signin:hover { color: var(--light); }
+  .learning-history-signin:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 
   /* ---------- Study sessions ---------- */
   .session-panel {
@@ -759,6 +805,8 @@
     .progress-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .topic-progress-row { display: grid; gap: 3px; }
     .topic-progress-row span:last-child { text-align: left; }
+    .learning-history-status { grid-template-columns: auto minmax(0, 1fr); }
+    .learning-history-signin { grid-column: 2; justify-self: start; }
     .session-panel { padding: 15px; }
     .session-setup-row, .topic-select-label, .session-actions { width: 100%; }
     .session-actions { flex-direction: column; }
@@ -904,6 +952,14 @@
       <div class="progress-metric"><b id="progress-percent"></b><span>Known %</span></div>
     </div>
     <div class="topic-progress" id="topic-progress" aria-label="Progress by topic" hidden></div>
+    <div class="learning-history-status" id="learning-history-status" data-state="anonymous" role="status" aria-live="polite" aria-atomic="true">
+      <span class="learning-history-icon" aria-hidden="true"></span>
+      <div class="learning-history-copy">
+        <strong id="learning-history-heading">Saved on this device</strong>
+        <p id="learning-history-description">Sign in to keep your learning history and access it across devices.</p>
+      </div>
+      <button class="learning-history-signin" id="learning-history-signin" type="button">Sign in</button>
+    </div>
   </section>
   <div class="toolbar" aria-labelledby="topic-label">
     <p class="topic-label" id="topic-label">Choose a topic</p>
@@ -5482,6 +5538,70 @@ function deriveProgressByTopic(cards, assessmentEvents) {
   return TOPICS.map(topic => deriveTopicProgress(cards, assessmentEvents, topic.id));
 }
 
+function deriveLearningHistoryStatus({
+  authenticated = false,
+  loading = false,
+  syncState = "idle",
+  eventCount = 0,
+  pendingCount = 0,
+  conflictCount = 0
+} = {}) {
+  if (loading || (authenticated && ["idle", "loading"].includes(syncState))) {
+    return {
+      state: "loading",
+      heading: "Loading progress…",
+      description: "Getting your learning history ready.",
+      showSignIn: false
+    };
+  }
+  if (!authenticated) {
+    return {
+      state: "anonymous",
+      heading: "Saved on this device",
+      description: "Sign in to keep your learning history and access it across devices.",
+      showSignIn: true
+    };
+  }
+  if (conflictCount > 0 || ["failed", "waiting"].includes(syncState)) {
+    return {
+      state: "problem",
+      heading: "Unable to sync right now",
+      description: "Your latest progress is saved on this device. We'll try again when possible.",
+      showSignIn: false
+    };
+  }
+  if (pendingCount > 0 || syncState === "saving") {
+    return {
+      state: "saving",
+      heading: "Saving…",
+      description: "Your latest progress is saved on this device.",
+      showSignIn: false
+    };
+  }
+  if (syncState === "saved" && eventCount === 0) {
+    return {
+      state: "empty",
+      heading: "Ready to start",
+      description: "Your learning history will be saved as you practice.",
+      showSignIn: false
+    };
+  }
+  if (syncState === "saved") {
+    return {
+      state: "saved",
+      heading: "Saved",
+      description: "Your learning history is saved and available across devices.",
+      showSignIn: false
+    };
+  }
+  return {
+    state: "problem",
+    heading: "Unable to sync right now",
+    description: "Your latest progress is saved on this device. We'll try again when possible.",
+    showSignIn: false
+  };
+}
+
 function cardId(c) {
   return c.id;
 }
@@ -5513,6 +5633,10 @@ const progressEmpty = document.getElementById("progress-empty");
 const progressMetrics = document.getElementById("progress-metrics");
 const topicProgress = document.getElementById("topic-progress");
 const progressPracticeWeak = document.getElementById("progress-practice-weak");
+const learningHistoryStatus = document.getElementById("learning-history-status");
+const learningHistoryHeading = document.getElementById("learning-history-heading");
+const learningHistoryDescription = document.getElementById("learning-history-description");
+const learningHistorySignIn = document.getElementById("learning-history-signin");
 
 function availableTopics() {
   return TOPICS.filter(topic => CARDS.some(card => card.topicId === topic.id));
@@ -5630,6 +5754,7 @@ function refreshSessionLauncher() {
 }
 
 function renderProgress() {
+  renderLearningHistoryStatus();
   if (learningContextLoading) {
     progressEmpty.hidden = false;
     progressEmpty.textContent = "Loading saved progress…";
@@ -5973,6 +6098,25 @@ let remoteAssessmentRepository = null;
 let syncCoordinator = null;
 let currentLearningUserId = null;
 let authTransition = 0;
+let currentSyncState = "idle";
+
+function renderLearningHistoryStatus() {
+  const userId = currentLearningUserId;
+  const authenticated = Boolean(userId);
+  const status = deriveLearningHistoryStatus({
+    authenticated,
+    loading: learningContextLoading,
+    syncState: currentSyncState,
+    eventCount: authenticated ? localAssessmentRepository.list(userId).length : 0,
+    pendingCount: authenticated ? localAssessmentRepository.pending(userId).length : 0,
+    conflictCount: authenticated ? localAssessmentRepository.conflictCount(userId) : 0
+  });
+  learningHistoryStatus.dataset.state = status.state;
+  learningHistoryHeading.textContent = status.heading;
+  learningHistoryDescription.textContent = status.description;
+  learningHistorySignIn.hidden = !status.showSignIn;
+  return status;
+}
 
 function authRedirectUrl() {
   return `${window.location.origin}${window.location.pathname}`;
@@ -6014,6 +6158,7 @@ function renderAuthState(state) {
 }
 
 function renderSyncState(state) {
+  currentSyncState = state;
   const labels = {
     loading: "Restoring progress…",
     saving: "Saving…",
@@ -6025,6 +6170,7 @@ function renderSyncState(state) {
   syncStatus.hidden = !visible;
   syncStatus.dataset.state = visible ? state : "";
   syncStatus.textContent = visible ? labels[state] : "";
+  renderLearningHistoryStatus();
 }
 
 function closeClaimDialog() {
@@ -6144,6 +6290,7 @@ async function initializeAuthentication() {
 }
 
 authOpen.addEventListener("click", showAuthDialog);
+learningHistorySignIn.addEventListener("click", showAuthDialog);
 document.getElementById("auth-close").addEventListener("click", closeAuthDialog);
 authDialog.addEventListener("click", event => {
   if (event.target === authDialog) closeAuthDialog();

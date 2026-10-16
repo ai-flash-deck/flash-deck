@@ -37,7 +37,8 @@
         assessQuestionPresentation, makeCard, progress, assessmentHistoryRepository,
         deriveQuestionProgress, isValidAssessmentEvent, getWeakQuestions,
         startWeakSession, deriveOverallProgress, deriveTopicProgress,
-        deriveProgressByTopic, renderProgress, localAssessmentRepository,
+        deriveProgressByTopic, deriveLearningHistoryStatus, renderLearningHistoryStatus,
+        renderProgress, renderSyncState, handleAuthState, localAssessmentRepository,
         refreshActiveProgress, saveAssessment
       })`);
       const authApi = app.AIMLAuth;
@@ -1191,6 +1192,117 @@
       test("T122: Netlify publishes only the generated production directory", async () => {
         const config = await fetchText("../netlify.toml");
         assert(/publish\s*=\s*"dist"/.test(config));
+      });
+
+      test("T127: anonymous learning-history status uses device wording", () => {
+        equal(api.deriveLearningHistoryStatus({ authenticated: false }), {
+          state: "anonymous",
+          heading: "Saved on this device",
+          description: "Sign in to keep your learning history and access it across devices.",
+          showSignIn: true
+        });
+        equal(app.document.getElementById("learning-history-status").previousElementSibling.id, "topic-progress");
+      });
+
+      test("T128: anonymous Sign in action opens the existing authentication dialog", () => {
+        app.eval('currentLearningUserId = null; learningContextLoading = false; currentSyncState = "idle"; closeAuthDialog(); renderLearningHistoryStatus()');
+        const button = app.document.getElementById("learning-history-signin");
+        assert(!button.hidden);
+        button.click();
+        assert(app.document.getElementById("auth-dialog").hasAttribute("open"));
+        app.eval("closeAuthDialog")();
+      });
+
+      test("T129: opening Sign in does not import anonymous history or open the claim dialog", () => {
+        const before = api.localAssessmentRepository.snapshot();
+        app.eval('currentLearningUserId = null; learningContextLoading = false; currentSyncState = "idle"; closeAuthDialog(); closeClaimDialog(); renderLearningHistoryStatus()');
+        app.document.getElementById("learning-history-signin").click();
+        equal(api.localAssessmentRepository.snapshot(), before);
+        assert(!app.document.getElementById("claim-dialog").hasAttribute("open"));
+        app.eval("closeAuthDialog")();
+      });
+
+      test("T130: authenticated remote-history loading is not labeled Saved", () => {
+        equal(api.deriveLearningHistoryStatus({ authenticated: true, loading: true, syncState: "loading", eventCount: 3 }).heading, "Loading progress…");
+      });
+
+      test("T131: fully synchronized non-empty history is labeled Saved", () => {
+        equal(api.deriveLearningHistoryStatus({ authenticated: true, syncState: "saved", eventCount: 2 }), {
+          state: "saved",
+          heading: "Saved",
+          description: "Your learning history is saved and available across devices.",
+          showSignIn: false
+        });
+      });
+
+      test("T132: pending uploads use the Saving status", () => {
+        equal(api.deriveLearningHistoryStatus({ authenticated: true, syncState: "saving", eventCount: 2, pendingCount: 1 }).heading, "Saving…");
+        equal(api.deriveLearningHistoryStatus({ authenticated: true, syncState: "saved", eventCount: 2, pendingCount: 1 }).state, "saving");
+      });
+
+      test("T133: offline pending uploads use the safe synchronization-problem status", () => {
+        const status = api.deriveLearningHistoryStatus({ authenticated: true, syncState: "waiting", eventCount: 2, pendingCount: 1 });
+        equal([status.state, status.heading], ["problem", "Unable to sync right now"]);
+        assert(status.description.includes("saved on this device"));
+      });
+
+      test("T134: remote synchronization errors do not imply lost local progress", () => {
+        const status = api.deriveLearningHistoryStatus({ authenticated: true, syncState: "failed", eventCount: 2 });
+        equal(status.heading, "Unable to sync right now");
+        assert(status.description.includes("saved on this device"));
+      });
+
+      test("T135: unresolved conflicts prevent the fully synchronized label", () => {
+        const status = api.deriveLearningHistoryStatus({ authenticated: true, syncState: "saved", eventCount: 2, conflictCount: 1 });
+        equal([status.state, status.heading], ["problem", "Unable to sync right now"]);
+      });
+
+      test("T136: an empty account becomes Ready to start only after successful loading", () => {
+        const status = api.deriveLearningHistoryStatus({ authenticated: true, syncState: "saved", eventCount: 0 });
+        equal([status.state, status.heading, status.description], ["empty", "Ready to start", "Your learning history will be saved as you practice."]);
+      });
+
+      test("T137: sign-out immediately restores anonymous learning-history wording", async () => {
+        app.eval('currentLearningUserId = "user_signout"; learningContextLoading = false; currentSyncState = "saved"; renderLearningHistoryStatus()');
+        api.handleAuthState({ status: authApi.AUTH_STATES.anonymous, identity: null, error: null });
+        await new Promise(resolve => app.setTimeout(resolve, 0));
+        equal(app.document.getElementById("learning-history-heading").textContent, "Saved on this device");
+        assert(!app.document.getElementById("learning-history-signin").hidden);
+      });
+
+      test("T138: a stale restore cannot overwrite the switched account's loading status", async () => {
+        const repository = createLocalRepository();
+        let release;
+        const deferred = new Promise(resolve => { release = resolve; });
+        const remote = { loadOwnEvents: () => deferred, insertOwnEvent: async () => ({ status: "inserted" }) };
+        const coordinator = syncApi.createSyncCoordinator({
+          localRepository: repository,
+          remoteRepository: remote,
+          onStatus: status => api.renderSyncState(status)
+        });
+        app.eval('currentLearningUserId = "user_a"; learningContextLoading = true');
+        coordinator.activate("user_a");
+        const restoring = coordinator.restoreForUser("user_a");
+        app.eval('currentLearningUserId = "user_b"; learningContextLoading = true');
+        coordinator.activate("user_b");
+        release({ status: "loaded", events: [eventRecord(ids[0], "known")] });
+        equal((await restoring).status, "stale");
+        equal(app.document.getElementById("learning-history-heading").textContent, "Loading progress…");
+        api.handleAuthState({ status: authApi.AUTH_STATES.anonymous, identity: null, error: null });
+      });
+
+      test("T139: learning-history presentation does not alter progress metrics", () => {
+        const before = api.deriveOverallProgress(cards, api.progress.assessmentEvents);
+        api.renderLearningHistoryStatus();
+        equal(api.deriveOverallProgress(cards, api.progress.assessmentEvents), before);
+      });
+
+      test("T140: learning-history presentation does not alter active-session state", () => {
+        const beforeRaw = app.localStorage.getItem(api.SESSION_KEY);
+        const beforeSession = api.loadSession();
+        api.renderLearningHistoryStatus();
+        equal(app.localStorage.getItem(api.SESSION_KEY), beforeRaw);
+        equal(api.loadSession(), beforeSession);
       });
 
       let passed = 0;
