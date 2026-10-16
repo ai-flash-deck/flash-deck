@@ -217,15 +217,15 @@ study continue.
 ### Release packaging, cache coherence, and recovery
 
 Production hosting publishes the checked-in `dist/` directory declared by
-`netlify.toml`. `scripts/package-release.ps1` recreates it from a ten-file runtime
+`netlify.toml`. `scripts/package-release.ps1` recreates it from an eleven-file runtime
 allowlist, excluding tests, internal documentation, database migrations, development
 scripts, local profiles, and Git metadata. The browser application remains a static,
 dependency-free PWA; packaging is a deterministic copy step rather than a runtime
 build system.
 
 All local JavaScript tags and service-worker app-shell entries use the same explicit
-asset version. Cache `aiml-deck-v25` requests `?v=25` scripts, so the existing v22
-worker's unversioned cache entries cannot satisfy a new page's script requests. The
+asset version. Cache `aiml-deck-v26` requests `?v=26` scripts, so the existing v25
+cache entries cannot satisfy a new page's script requests. The
 new worker pre-caches the coherent shell, activates immediately, deletes older named
 caches, and claims clients. Cross-origin authentication and data traffic remains
 outside the application cache.
@@ -237,6 +237,16 @@ preserve anonymous events, account buckets, pending IDs, conflicts, and claim
 decisions. This local artifact is intended for a same-origin emergency roll-forward,
 not an ordinary release. It is excluded from Git and from the Netlify production
 package.
+
+### Beta feedback boundary
+
+`feedback-config.js` is the single browser-safe switch for the optional Tally feedback
+entry. The entry is absent unless `enabled` is explicitly true and `formUrl` is a valid
+HTTPS URL. Opening it does not enter the authentication, claim, study-session, progress,
+or synchronization flows. The optional context contract allows only a validated
+immutable question ID under an explicitly configured query-field name. Identity,
+tokens, session IDs, card content, answers, and learning history are never read or
+appended. Disabling the config removes the entry without a persistence or schema change.
 
 The schema-4 production version is not a data-safe rollback after schema-5 migration.
 It treats schema-5 storage as unsupported and can overwrite it after a new assessment.

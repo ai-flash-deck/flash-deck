@@ -39,7 +39,9 @@
         startWeakSession, deriveOverallProgress, deriveTopicProgress,
         deriveProgressByTopic, deriveLearningHistoryStatus, renderLearningHistoryStatus,
         renderProgress, renderSyncState, handleAuthState, localAssessmentRepository,
-        refreshActiveProgress, saveAssessment
+        refreshActiveProgress, saveAssessment,
+        normalizeFeedbackConfig, buildFeedbackUrl, getActiveFeedbackQuestionId,
+        initializeFeedback
       })`);
       const authApi = app.AIMLAuth;
       const syncApi = app.AIMLLearningSync;
@@ -1063,7 +1065,7 @@
 
       test("T114: generated production package contains every required runtime asset", async () => {
         const required = [
-          "index.html", "auth-config.js", "auth-service.js", "learning-sync.js",
+          "index.html", "feedback-config.js", "auth-config.js", "auth-service.js", "learning-sync.js",
           "remote-assessment-repository.js", "sw.js", "manifest.json",
           "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png"
         ];
@@ -1084,32 +1086,33 @@
       test("T116: production HTML references one consistent version of every local script", async () => {
         const html = await fetchText("../dist/index.html");
         const expected = [
-          "auth-config.js?v=25", "auth-service.js?v=25",
-          "learning-sync.js?v=25", "remote-assessment-repository.js?v=25"
+          "feedback-config.js?v=26", "auth-config.js?v=26", "auth-service.js?v=26",
+          "learning-sync.js?v=26", "remote-assessment-repository.js?v=26"
         ];
         assert(expected.every(path => html.includes(`src="${path}"`)), "production script versions are inconsistent");
       });
 
       test("T117: production service worker caches the matching version and cleans old caches", async () => {
         const worker = await fetchText("../dist/sw.js");
-        assert(worker.includes('const CACHE_VERSION = "aiml-deck-v25";'));
+        assert(worker.includes('const CACHE_VERSION = "aiml-deck-v26";'));
         [
-          "./auth-config.js?v=25", "./auth-service.js?v=25",
-          "./learning-sync.js?v=25", "./remote-assessment-repository.js?v=25"
+          "./feedback-config.js?v=26", "./auth-config.js?v=26", "./auth-service.js?v=26",
+          "./learning-sync.js?v=26", "./remote-assessment-repository.js?v=26"
         ].forEach(path => assert(worker.includes(`"${path}"`), `missing worker entry ${path}`));
         assert(worker.includes("self.skipWaiting()"), "new worker does not activate promptly");
         assert(worker.includes("keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))"), "old caches are not removed");
         assert(worker.includes("self.clients.claim()"), "new worker does not claim open clients");
       });
 
-      test("T118: old v22 cache keys cannot satisfy the new application script requests", async () => {
+      test("T118: old v25 cache keys cannot satisfy the new application script requests", async () => {
         const html = await fetchText("../dist/index.html");
         const requested = [...html.matchAll(/<script src="([^"]+)"/g)].map(match => `./${match[1]}`);
-        const oldV22Keys = new Set([
-          "./auth-config.js", "./auth-service.js", "./learning-sync.js", "./remote-assessment-repository.js"
+        const oldV25Keys = new Set([
+          "./auth-config.js?v=25", "./auth-service.js?v=25",
+          "./learning-sync.js?v=25", "./remote-assessment-repository.js?v=25"
         ]);
-        equal(requested.length, 4);
-        assert(requested.every(path => path.includes("?v=25") && !oldV22Keys.has(path)), "a v25 request reuses a v22 cache key");
+        equal(requested.length, 5);
+        assert(requested.every(path => path.includes("?v=26") && !oldV25Keys.has(path)), "a v26 request reuses a v25 cache key");
       });
 
       test("T119: emergency recovery package has isolated cache keys and disables cloud configuration", async () => {
@@ -1118,10 +1121,12 @@
           fetchText("../recovery-dist/sw.js"),
           fetchText("../recovery-dist/auth-config.js")
         ]);
-        assert(html.includes("auth-service.js?v=25-recovery-2"));
-        assert(html.includes("learning-sync.js?v=25-recovery-2"));
-        assert(worker.includes('const CACHE_VERSION = "aiml-deck-recovery-v2";'));
-        assert(worker.includes("./auth-config.js?v=25-recovery-2"));
+        assert(html.includes("feedback-config.js?v=26-recovery-3"));
+        assert(html.includes("auth-service.js?v=26-recovery-3"));
+        assert(html.includes("learning-sync.js?v=26-recovery-3"));
+        assert(worker.includes('const CACHE_VERSION = "aiml-deck-recovery-v3";'));
+        assert(worker.includes("./feedback-config.js?v=26-recovery-3"));
+        assert(worker.includes("./auth-config.js?v=26-recovery-3"));
         assert(config.includes('supabaseUrl: ""') && config.includes('supabasePublishableKey: ""'));
       });
 
@@ -1303,6 +1308,120 @@
         api.renderLearningHistoryStatus();
         equal(app.localStorage.getItem(api.SESSION_KEY), beforeRaw);
         equal(api.loadSession(), beforeSession);
+      });
+
+      const enabledFeedback = Object.freeze({
+        enabled: true,
+        formUrl: "https://tally.so/r/beta-test",
+        questionIdField: "question_id"
+      });
+      const clickWithoutNavigation = link => {
+        link.addEventListener("click", event => event.preventDefault(), { capture: true, once: true });
+        link.click();
+      };
+
+      test("T141: beta feedback is disabled by default", () => {
+        equal(app.AIML_FEEDBACK_CONFIG, { enabled: false, formUrl: "", questionIdField: "" });
+        assert(!app.document.getElementById("feedback-open"));
+      });
+
+      test("T142: enabled feedback with a missing URL remains hidden", () => {
+        equal(api.initializeFeedback({ enabled: true, formUrl: "", questionIdField: "" }), null);
+        assert(!app.document.getElementById("feedback-open"));
+      });
+
+      test("T143: a valid HTTPS configuration shows one compact feedback entry", () => {
+        const link = api.initializeFeedback(enabledFeedback);
+        assert(link && app.document.querySelectorAll("#feedback-open").length === 1);
+        assert(link.textContent.includes("Feedback"));
+      });
+
+      test("T144: anonymous users can open the configured feedback form", () => {
+        app.eval("currentLearningUserId = null");
+        const link = api.initializeFeedback(enabledFeedback);
+        clickWithoutNavigation(link);
+        equal(new URL(link.href).origin, "https://tally.so");
+      });
+
+      test("T145: signed-in users receive the same feedback entry and URL", () => {
+        const anonymousHref = api.initializeFeedback(enabledFeedback).href;
+        app.eval('currentLearningUserId = "feedback_test_user"');
+        const signedInLink = api.initializeFeedback(enabledFeedback);
+        clickWithoutNavigation(signedInLink);
+        equal(signedInLink.href, anonymousHref);
+        app.eval("currentLearningUserId = null");
+      });
+
+      test("T146: feedback opening requires no authentication or import workflow", () => {
+        const beforeProgress = app.localStorage.getItem(api.PROGRESS_KEY);
+        const beforeDialog = app.document.getElementById("claim-dialog").open;
+        const link = api.initializeFeedback(enabledFeedback);
+        clickWithoutNavigation(link);
+        equal(app.localStorage.getItem(api.PROGRESS_KEY), beforeProgress);
+        equal(app.document.getElementById("claim-dialog").open, beforeDialog);
+      });
+
+      test("T147: feedback opens in a protected new tab", () => {
+        const link = api.initializeFeedback(enabledFeedback);
+        equal(link.target, "_blank");
+        assert(link.relList.contains("noopener") && link.relList.contains("noreferrer"));
+        assert(link.getAttribute("aria-label").includes("new tab"));
+      });
+
+      test("T148: only valid HTTPS feedback destinations are accepted", () => {
+        ["http://tally.so/r/test", "javascript:alert(1)", "data:text/html,test", "not a URL"].forEach(formUrl => {
+          assert(!api.normalizeFeedbackConfig({ enabled: true, formUrl }));
+        });
+        assert(api.normalizeFeedbackConfig(enabledFeedback));
+      });
+
+      test("T149: optional question context uses only a valid immutable question ID", () => {
+        const url = new URL(api.buildFeedbackUrl(enabledFeedback, ids[0]));
+        equal(url.searchParams.get("question_id"), ids[0]);
+        equal([...url.searchParams.keys()], ["question_id"]);
+        const unknown = new URL(api.buildFeedbackUrl(enabledFeedback, "q_9999"));
+        assert(!unknown.searchParams.has("question_id"));
+      });
+
+      test("T150: question context is omitted when unavailable or not configured", () => {
+        assert(!new URL(api.buildFeedbackUrl(enabledFeedback)).searchParams.has("question_id"));
+        const noField = { ...enabledFeedback, questionIdField: "" };
+        equal([...new URL(api.buildFeedbackUrl(noField, ids[0])).searchParams.keys()], []);
+      });
+
+      test("T151: feedback URLs contain no identity, token, session, history, or answer data", () => {
+        app.eval('currentLearningUserId = "private_user_id"');
+        const url = new URL(api.buildFeedbackUrl(enabledFeedback, ids[0]));
+        equal([...url.searchParams.entries()], [["question_id", ids[0]]]);
+        const serialized = url.href.toLowerCase();
+        ["private_user_id", "email", "token", "sessionid", "answer", "history"].forEach(value => {
+          assert(!serialized.includes(value), `feedback URL leaked ${value}`);
+        });
+        app.eval("currentLearningUserId = null");
+      });
+
+      test("T152: opening feedback does not alter study-session state", () => {
+        const beforeRaw = app.localStorage.getItem(api.SESSION_KEY);
+        const beforeSession = api.loadSession();
+        const link = api.initializeFeedback(enabledFeedback);
+        clickWithoutNavigation(link);
+        equal(app.localStorage.getItem(api.SESSION_KEY), beforeRaw);
+        equal(api.loadSession(), beforeSession);
+      });
+
+      test("T153: feedback control is fixed, touch-sized, and responsive", () => {
+        const link = api.initializeFeedback(enabledFeedback);
+        const style = app.getComputedStyle(link);
+        equal(style.position, "fixed");
+        assert(parseFloat(style.minWidth) >= 44 && parseFloat(style.minHeight) >= 44);
+        assert(style.left !== "auto", "narrow viewport should place feedback away from right-side controls");
+      });
+
+      test("T154: disabling feedback removes an existing entry cleanly", () => {
+        api.initializeFeedback(enabledFeedback);
+        assert(app.document.getElementById("feedback-open"));
+        equal(api.initializeFeedback({ enabled: false, formUrl: enabledFeedback.formUrl }), null);
+        assert(!app.document.getElementById("feedback-open"));
       });
 
       let passed = 0;

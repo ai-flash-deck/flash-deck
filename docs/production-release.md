@@ -14,6 +14,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps
 The command recreates `dist/` from an explicit allowlist. The output contains only:
 
 - `index.html`
+- `feedback-config.js`
 - `auth-config.js`
 - `auth-service.js`
 - `learning-sync.js`
@@ -33,13 +34,13 @@ change in `dist/`.
 
 ## Service-worker upgrade behavior
 
-The schema-5 release uses cache `aiml-deck-v25`. Every local JavaScript request in
+The schema-5 release uses cache `aiml-deck-v26`. Every local JavaScript request in
 `index.html` and every corresponding service-worker app-shell entry uses the same
-`?v=25` URL.
+`?v=26` URL.
 
-The production v22 worker cached unversioned script URLs. Cache matching includes
-the query string, so v22 cannot answer the new v25 requests with an old authentication
-or synchronization script. It must fetch the coherent v25 files. The v25 worker then
+Cache matching includes the query string, so the deployed v25 worker cannot answer
+the new v26 requests with old application scripts. It must fetch the coherent v26
+files. The v26 worker then
 pre-caches that set, calls `skipWaiting()`, deletes caches with other names during
 activation, and claims open clients. Navigation remains network-first with the
 cached `index.html` as its offline fallback; same-origin app-shell files remain
@@ -60,7 +61,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps
 This creates ignored local directory `recovery-dist/`. It uses the production
 schema-5 application and persistence implementation unchanged, replaces the public
 authentication configuration with an empty configuration, and uses isolated
-`v=25-recovery-2` asset URLs plus cache `aiml-deck-recovery-v2`.
+`v=26-recovery-3` asset URLs plus cache `aiml-deck-recovery-v3`.
 
 Use this artifact only as an emergency roll-forward deployment when the schema-5
 production application is unusable and a normal hotfix cannot be published quickly.
@@ -101,7 +102,7 @@ Before pushing the release, verify in the Netlify dashboard:
    configuration.
 7. The primary production URL is `https://exquisite-malabi-dd2138.netlify.app/`.
 
-After deployment, confirm the published commit, verify cache `aiml-deck-v25`, and
+After deployment, confirm the published commit, verify cache `aiml-deck-v26`, and
 confirm `/tests/`, `/docs/`, `/supabase/`, and `/scripts/` return 404.
 
 ## Supabase authentication verification

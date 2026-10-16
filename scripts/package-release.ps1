@@ -15,6 +15,7 @@ if (-not $outputPath.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgno
 
 $runtimeFiles = @(
   "index.html",
+  "feedback-config.js",
   "auth-config.js",
   "auth-service.js",
   "learning-sync.js",
@@ -45,24 +46,24 @@ foreach ($relativePath in $runtimeFiles + $iconFiles) {
 
 if ($Mode -eq "Recovery") {
   $utf8NoBom = [Text.UTF8Encoding]::new($false)
-  $productionVersion = "v=25"
-  $recoveryVersion = "v=25-recovery-2"
+  $productionVersion = "v=26"
+  $recoveryVersion = "v=26-recovery-3"
 
   $indexPath = Join-Path $outputPath "index.html"
   $index = [IO.File]::ReadAllText($indexPath)
   $versionedScriptCount = ([regex]::Matches($index, [regex]::Escape($productionVersion))).Count
-  if ($versionedScriptCount -ne 4) {
-    throw "Expected four production script-version references; found $versionedScriptCount."
+  if ($versionedScriptCount -ne 5) {
+    throw "Expected five production script-version references; found $versionedScriptCount."
   }
   $index = $index.Replace($productionVersion, $recoveryVersion)
   [IO.File]::WriteAllText($indexPath, $index, $utf8NoBom)
 
   $workerPath = Join-Path $outputPath "sw.js"
   $worker = [IO.File]::ReadAllText($workerPath)
-  if (-not $worker.Contains('const CACHE_VERSION = "aiml-deck-v25";')) {
-    throw "The recovery package expected production cache version aiml-deck-v25."
+  if (-not $worker.Contains('const CACHE_VERSION = "aiml-deck-v26";')) {
+    throw "The recovery package expected production cache version aiml-deck-v26."
   }
-  $worker = $worker.Replace('const CACHE_VERSION = "aiml-deck-v25";', 'const CACHE_VERSION = "aiml-deck-recovery-v2";')
+  $worker = $worker.Replace('const CACHE_VERSION = "aiml-deck-v26";', 'const CACHE_VERSION = "aiml-deck-recovery-v3";')
   $worker = $worker.Replace($productionVersion, $recoveryVersion)
   [IO.File]::WriteAllText($workerPath, $worker, $utf8NoBom)
 

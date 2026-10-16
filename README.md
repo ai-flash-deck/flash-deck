@@ -16,6 +16,7 @@ boundaries, known risks, and the recommended next iteration.
 index.html          The full app (deck + styles + logic)
 auth-service.js     Provider-neutral identity boundary and Supabase adapter
 auth-config.js      Browser-safe public authentication configuration
+feedback-config.js  Browser-safe beta feedback configuration
 learning-sync.js    Schema-5 local history, merge, claim, and sync coordinator
 remote-assessment-repository.js  Supabase assessment-event repository
 ARCHITECTURE.md      Current architecture, boundaries, and migration plan
@@ -82,6 +83,29 @@ Keep an existing card's `id` unchanged when editing its question, answer, or
 category. After changing `index.html` or any asset, bump `CACHE_VERSION` in `sw.js`
 (e.g. `aiml-deck-v1` → `v2`) so installed clients fetch the new version instead of the cached one.
 
+## Beta feedback configuration
+
+Beta feedback is disabled by default. Create and publish the feedback form in Tally,
+then edit only the browser-safe values in `feedback-config.js`:
+
+```js
+window.AIML_FEEDBACK_CONFIG = Object.freeze({
+  enabled: true,
+  formUrl: "https://tally.so/r/your-form-id",
+  questionIdField: "question_id"
+});
+```
+
+The form itself should require a feedback type and description, with email optional.
+Set `questionIdField` only after creating a matching hidden field in Tally; otherwise
+leave it empty. The application may then attach the current immutable question ID.
+It never sends an account email, user ID, auth token, session ID, answer, or learning
+history. Anonymous and signed-in users use the same external form in a new tab.
+
+Set `enabled` to `false` to remove the entry from the UI without changing application
+code. To remove the integration entirely later, remove `feedback-config.js` from the
+HTML, service-worker app shell, release allowlist, and the feedback styles/functions/tests.
+
 ## Test locally
 
 ### Automated regression tests
@@ -94,7 +118,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
 
 The runner starts a temporary loopback-only static server and uses the installed
 Microsoft Edge JavaScript runtime. It does not install packages or access the
-internet. The 140 tests cover the 205 immutable question IDs, stable topic IDs,
+internet. The 154 tests cover the 205 immutable question IDs, stable topic IDs,
 canonical assessment semantics, reveal and duplicate guards, Quick and Full
 session selection, result calculation, multi-session assessment history, derived
 status and counters, reload persistence, legacy ID and storage-schema migration,
@@ -109,7 +133,10 @@ local learning data without network access. Schema-5 and synchronization tests u
 in-memory storage and mocked Supabase responses to cover safe migration,
 interruption, account isolation, anonymous import decisions, remote pagination,
 duplicate and conflict handling, retries, stale responses, and deterministic
-local/cloud merging.
+local/cloud merging. They also verify the disabled-by-default feedback configuration,
+HTTPS-only external destination, anonymous and signed-in parity, protected new-tab
+behavior, optional immutable-question context, data minimization, session preservation,
+and responsive touch sizing.
 The test runner regenerates and loads `dist/index.html`, so these checks execute the
 actual packaged production functions and card data.
 

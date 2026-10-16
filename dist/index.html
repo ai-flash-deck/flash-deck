@@ -777,6 +777,32 @@
     border: 0;
   }
 
+  .feedback-button {
+    position: fixed;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    z-index: 30;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 1px solid var(--teal-deep);
+    border-radius: 999px;
+    box-shadow: 0 4px 18px rgba(26, 48, 44, 0.18);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: #fff;
+    background: var(--teal-deep);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    text-decoration: none;
+  }
+  .feedback-button:hover { background: var(--ink); border-color: var(--ink); }
+  .feedback-button:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+
   footer {
     margin-top: 48px;
     padding-top: 22px;
@@ -795,6 +821,11 @@
   }
 
   @media (max-width: 520px) {
+    .feedback-button {
+      right: auto;
+      left: max(12px, env(safe-area-inset-left));
+      bottom: max(12px, env(safe-area-inset-bottom));
+    }
     .account-bar { justify-content: flex-start; flex-wrap: wrap; }
     .auth-email + .session-button { margin-top: 10px; }
     .auth-dialog { width: calc(100% - 24px); max-height: calc(100dvh - 24px); }
@@ -975,10 +1006,11 @@
   </div>
 </div>
 
-<script src="auth-config.js?v=25"></script>
-<script src="auth-service.js?v=25"></script>
-<script src="learning-sync.js?v=25"></script>
-<script src="remote-assessment-repository.js?v=25"></script>
+<script src="feedback-config.js?v=26"></script>
+<script src="auth-config.js?v=26"></script>
+<script src="auth-service.js?v=26"></script>
+<script src="learning-sync.js?v=26"></script>
+<script src="remote-assessment-repository.js?v=26"></script>
 <script>
 /**
  * @typedef {"known" | "needs_review"} AssessmentResult
@@ -5234,6 +5266,31 @@ const ASSESSMENT_RESULTS = Object.freeze({ known: "known", needsReview: "needs_r
 const ASSESSMENT_RESULT_VALUES = new Set(Object.values(ASSESSMENT_RESULTS));
 const cardsById = new Map(CARDS.map(question => [cardId(question), question]));
 
+function normalizeFeedbackConfig(config) {
+  if (!config || config.enabled !== true || typeof config.formUrl !== "string") return null;
+  try {
+    const formUrl = new URL(config.formUrl);
+    if (formUrl.protocol !== "https:") return null;
+    const questionIdField = typeof config.questionIdField === "string" &&
+      /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(config.questionIdField)
+      ? config.questionIdField
+      : "";
+    return { enabled: true, formUrl: formUrl.href, questionIdField };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function buildFeedbackUrl(config, questionId = null) {
+  const normalized = normalizeFeedbackConfig(config);
+  if (!normalized) return null;
+  const url = new URL(normalized.formUrl);
+  if (normalized.questionIdField && cardsById.has(questionId)) {
+    url.searchParams.set(normalized.questionIdField, questionId);
+  }
+  return url.href;
+}
+
 function validateQuestionIdentity() {
   const ids = CARDS.map(cardId);
   const invalid = ids.filter(id => !/^q_\d{4}$/.test(id));
@@ -5669,6 +5726,7 @@ function loadSession() {
 let session = loadSession();
 let activeTopicId = "all";
 let advancing = false;
+let feedbackBrowseQuestionId = null;
 const regressionTestMode = new URLSearchParams(window.location.search).has("regression-test");
 let learningContextLoading = !regressionTestMode && AIMLAuth.hasPublicAuthConfig(window.AIML_AUTH_CONFIG);
 
@@ -5927,6 +5985,7 @@ function buildChips() {
 }
 
 function render() {
+  feedbackBrowseQuestionId = null;
   buildChips();
   grid.innerHTML = "";
   const list = CARDS.filter(c => activeTopicId === "all" || c.topicId === activeTopicId);
@@ -5982,6 +6041,10 @@ function makeCard(c, options = {}) {
   let presentationEvent = options.initialEvent || null;
   const flip = (state) => {
     if (state) revealed = true;
+    if (!options.sessionId) {
+      if (state) feedbackBrowseQuestionId = id;
+      else if (feedbackBrowseQuestionId === id) feedbackBrowseQuestionId = null;
+    }
     card.classList.toggle("flipped", state);
     card.setAttribute("aria-pressed", state);
     front.setAttribute("aria-hidden", !state);
@@ -6026,6 +6089,35 @@ function makeCard(c, options = {}) {
   });
 
   return card;
+}
+
+function getActiveFeedbackQuestionId() {
+  if (!sessionView.hidden && session?.status === "active") {
+    const questionId = session.cardIds[session.position];
+    return cardsById.has(questionId) ? questionId : null;
+  }
+  if (!browseView.hidden && cardsById.has(feedbackBrowseQuestionId)) return feedbackBrowseQuestionId;
+  return null;
+}
+
+function initializeFeedback(config = window.AIML_FEEDBACK_CONFIG) {
+  document.getElementById("feedback-open")?.remove();
+  const normalized = normalizeFeedbackConfig(config);
+  if (!normalized) return null;
+
+  const link = document.createElement("a");
+  link.id = "feedback-open";
+  link.className = "feedback-button";
+  link.href = buildFeedbackUrl(normalized);
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.setAttribute("aria-label", "Send feedback (opens in a new tab)");
+  link.innerHTML = '<span aria-hidden="true">&#9998;</span><span>Feedback</span>';
+  link.addEventListener("click", () => {
+    link.href = buildFeedbackUrl(normalized, getActiveFeedbackQuestionId());
+  });
+  document.body.appendChild(link);
+  return link;
 }
 
 document.querySelectorAll("[data-session-type]").forEach(button => {
@@ -6395,6 +6487,7 @@ populateSessionTopics();
 render();
 if (session?.status === "completed") showSummary();
 else showDeck();
+initializeFeedback();
 if (regressionTestMode) {
   handleAuthState({ status: AIMLAuth.AUTH_STATES.anonymous, identity: null, error: null });
 } else {
