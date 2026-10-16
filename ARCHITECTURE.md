@@ -224,7 +224,7 @@ dependency-free PWA; packaging is a deterministic copy step rather than a runtim
 build system.
 
 All local JavaScript tags and service-worker app-shell entries use the same explicit
-asset version. Cache `aiml-deck-v24` requests `?v=24` scripts, so the existing v22
+asset version. Cache `aiml-deck-v25` requests `?v=25` scripts, so the existing v22
 worker's unversioned cache entries cannot satisfy a new page's script requests. The
 new worker pre-caches the coherent shell, activates immediately, deletes older named
 caches, and claims clients. Cross-origin authentication and data traffic remains

@@ -45,8 +45,8 @@ foreach ($relativePath in $runtimeFiles + $iconFiles) {
 
 if ($Mode -eq "Recovery") {
   $utf8NoBom = [Text.UTF8Encoding]::new($false)
-  $productionVersion = "v=24"
-  $recoveryVersion = "v=24-recovery-1"
+  $productionVersion = "v=25"
+  $recoveryVersion = "v=25-recovery-2"
 
   $indexPath = Join-Path $outputPath "index.html"
   $index = [IO.File]::ReadAllText($indexPath)
@@ -59,10 +59,10 @@ if ($Mode -eq "Recovery") {
 
   $workerPath = Join-Path $outputPath "sw.js"
   $worker = [IO.File]::ReadAllText($workerPath)
-  if (-not $worker.Contains('const CACHE_VERSION = "aiml-deck-v24";')) {
-    throw "The recovery package expected production cache version aiml-deck-v24."
+  if (-not $worker.Contains('const CACHE_VERSION = "aiml-deck-v25";')) {
+    throw "The recovery package expected production cache version aiml-deck-v25."
   }
-  $worker = $worker.Replace('const CACHE_VERSION = "aiml-deck-v24";', 'const CACHE_VERSION = "aiml-deck-recovery-v1";')
+  $worker = $worker.Replace('const CACHE_VERSION = "aiml-deck-v25";', 'const CACHE_VERSION = "aiml-deck-recovery-v2";')
   $worker = $worker.Replace($productionVersion, $recoveryVersion)
   [IO.File]::WriteAllText($workerPath, $worker, $utf8NoBom)
 

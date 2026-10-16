@@ -33,13 +33,13 @@ change in `dist/`.
 
 ## Service-worker upgrade behavior
 
-The schema-5 release uses cache `aiml-deck-v24`. Every local JavaScript request in
+The schema-5 release uses cache `aiml-deck-v25`. Every local JavaScript request in
 `index.html` and every corresponding service-worker app-shell entry uses the same
-`?v=24` URL.
+`?v=25` URL.
 
 The production v22 worker cached unversioned script URLs. Cache matching includes
-the query string, so v22 cannot answer the new v24 requests with an old authentication
-or synchronization script. It must fetch the coherent v24 files. The v24 worker then
+the query string, so v22 cannot answer the new v25 requests with an old authentication
+or synchronization script. It must fetch the coherent v25 files. The v25 worker then
 pre-caches that set, calls `skipWaiting()`, deletes caches with other names during
 activation, and claims open clients. Navigation remains network-first with the
 cached `index.html` as its offline fallback; same-origin app-shell files remain
@@ -60,7 +60,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps
 This creates ignored local directory `recovery-dist/`. It uses the production
 schema-5 application and persistence implementation unchanged, replaces the public
 authentication configuration with an empty configuration, and uses isolated
-`v=24-recovery-1` asset URLs plus cache `aiml-deck-recovery-v1`.
+`v=25-recovery-2` asset URLs plus cache `aiml-deck-recovery-v2`.
 
 Use this artifact only as an emergency roll-forward deployment when the schema-5
 production application is unusable and a normal hotfix cannot be published quickly.
@@ -101,7 +101,7 @@ Before pushing the release, verify in the Netlify dashboard:
    configuration.
 7. The primary production URL is `https://exquisite-malabi-dd2138.netlify.app/`.
 
-After deployment, confirm the published commit, verify cache `aiml-deck-v24`, and
+After deployment, confirm the published commit, verify cache `aiml-deck-v25`, and
 confirm `/tests/`, `/docs/`, `/supabase/`, and `/scripts/` return 404.
 
 ## Supabase authentication verification

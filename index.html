@@ -919,10 +919,10 @@
   </div>
 </div>
 
-<script src="auth-config.js?v=24"></script>
-<script src="auth-service.js?v=24"></script>
-<script src="learning-sync.js?v=24"></script>
-<script src="remote-assessment-repository.js?v=24"></script>
+<script src="auth-config.js?v=25"></script>
+<script src="auth-service.js?v=25"></script>
+<script src="learning-sync.js?v=25"></script>
+<script src="remote-assessment-repository.js?v=25"></script>
 <script>
 /**
  * @typedef {"known" | "needs_review"} AssessmentResult
@@ -6081,6 +6081,7 @@ function handleAuthState(state) {
 function showAuthDialog() {
   authMessage.className = "auth-message";
   authMessage.textContent = "";
+  delete authMessage.dataset.errorCode;
   if (typeof authDialog.showModal === "function") authDialog.showModal();
   else authDialog.setAttribute("open", "");
 }
@@ -6090,6 +6091,7 @@ function showEmailEntry({ focus = false } = {}) {
   authEmailSuccess.hidden = true;
   authMessage.className = "auth-message";
   authMessage.textContent = "";
+  delete authMessage.dataset.errorCode;
   if (focus) document.getElementById("auth-email").focus();
 }
 
@@ -6099,6 +6101,7 @@ function showEmailSuccess(email) {
   authSentEmail.textContent = email;
   authMessage.className = "auth-message";
   authMessage.textContent = "";
+  delete authMessage.dataset.errorCode;
 }
 
 function closeAuthDialog() {
@@ -6179,13 +6182,16 @@ authEmailForm.addEventListener("submit", async event => {
   submit.textContent = "Sending link…";
   authMessage.className = "auth-message";
   authMessage.textContent = "Sending your secure sign-in link…";
+  delete authMessage.dataset.errorCode;
   try {
     const email = document.getElementById("auth-email").value.trim();
     await authService.signInWithEmail(email, authRedirectUrl());
     showEmailSuccess(email);
-  } catch (_error) {
+  } catch (error) {
+    const detail = AIMLAuth.describeEmailSignInError(error);
     authMessage.className = "auth-message error";
-    authMessage.textContent = "We couldn't send the sign-in link. Check your email and connection, then try again.";
+    authMessage.dataset.errorCode = detail.diagnosticCode;
+    authMessage.textContent = `${detail.userMessage} Reference: ${detail.diagnosticCode}.`;
   } finally {
     submit.disabled = false;
     submit.textContent = originalLabel;

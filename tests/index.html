@@ -658,7 +658,59 @@
         form.dispatchEvent(new app.SubmitEvent("submit", { bubbles: true, cancelable: true, submitter: submit }));
         await new Promise(resolve => app.setTimeout(resolve, 0));
         assert(!submit.disabled);
-        assert(app.document.getElementById("auth-message").textContent.includes("couldn't send"));
+        const message = app.document.getElementById("auth-message");
+        equal(message.dataset.errorCode, "EMAIL_NETWORK_ERROR");
+        assert(message.textContent.includes("could not reach the sign-in service"));
+      });
+      test("T123: email sign-in rate limits have one safe diagnostic category", () => {
+        equal(
+          authApi.describeEmailSignInError({ status: 429, message: "provider detail" }),
+          {
+            category: "rate_limited",
+            diagnosticCode: "EMAIL_RATE_LIMIT",
+            userMessage: "Too many sign-in links were requested. Wait a few minutes before trying again."
+          }
+        );
+        equal(
+          authApi.describeEmailSignInError({ code: "over_email_send_rate_limit" }).diagnosticCode,
+          "EMAIL_RATE_LIMIT"
+        );
+      });
+      test("T124: email provider restrictions and configuration failures remain distinguishable", () => {
+        equal(
+          authApi.describeEmailSignInError({ code: "email_address_not_authorized" }).diagnosticCode,
+          "EMAIL_DELIVERY_RESTRICTED"
+        );
+        equal(
+          authApi.describeEmailSignInError({ code: "email_address_invalid" }).diagnosticCode,
+          "EMAIL_ADDRESS_REJECTED"
+        );
+        equal(
+          authApi.describeEmailSignInError({ code: "email_provider_disabled" }).diagnosticCode,
+          "EMAIL_SIGN_IN_UNAVAILABLE"
+        );
+      });
+      test("T125: service, network, validation, and unknown email errors fail safely", () => {
+        equal(authApi.describeEmailSignInError({ status: 503 }).diagnosticCode, "EMAIL_SERVICE_UNAVAILABLE");
+        equal(authApi.describeEmailSignInError(new TypeError("Failed to fetch")).diagnosticCode, "EMAIL_NETWORK_ERROR");
+        equal(authApi.describeEmailSignInError(new Error("Enter a valid email address.")).diagnosticCode, "EMAIL_INVALID");
+        equal(authApi.describeEmailSignInError(new Error("private provider detail")).diagnosticCode, "EMAIL_AUTH_ERROR");
+      });
+      test("T126: magic-link UI shows a safe reference without exposing provider detail", async () => {
+        const providerError = Object.assign(new Error("secret smtp account detail"), {
+          code: "email_address_not_authorized"
+        });
+        app.__testAuthService = { signInWithEmail: async () => { throw providerError; } };
+        app.eval("authService = window.__testAuthService");
+        const form = app.document.getElementById("auth-email-form");
+        const submit = form.querySelector('button[type="submit"]');
+        app.document.getElementById("auth-email").value = "learner@example.com";
+        form.dispatchEvent(new app.SubmitEvent("submit", { bubbles: true, cancelable: true, submitter: submit }));
+        await new Promise(resolve => app.setTimeout(resolve, 0));
+        const message = app.document.getElementById("auth-message");
+        equal(message.dataset.errorCode, "EMAIL_DELIVERY_RESTRICTED");
+        assert(message.textContent.includes("Reference: EMAIL_DELIVERY_RESTRICTED."));
+        assert(!message.textContent.includes("secret smtp account detail"));
       });
       test("T81: anonymous study controls remain available without authentication", () => {
         equal(app.document.getElementById("auth-status").textContent, "Practice without an account");
@@ -1031,18 +1083,18 @@
       test("T116: production HTML references one consistent version of every local script", async () => {
         const html = await fetchText("../dist/index.html");
         const expected = [
-          "auth-config.js?v=24", "auth-service.js?v=24",
-          "learning-sync.js?v=24", "remote-assessment-repository.js?v=24"
+          "auth-config.js?v=25", "auth-service.js?v=25",
+          "learning-sync.js?v=25", "remote-assessment-repository.js?v=25"
         ];
         assert(expected.every(path => html.includes(`src="${path}"`)), "production script versions are inconsistent");
       });
 
       test("T117: production service worker caches the matching version and cleans old caches", async () => {
         const worker = await fetchText("../dist/sw.js");
-        assert(worker.includes('const CACHE_VERSION = "aiml-deck-v24";'));
+        assert(worker.includes('const CACHE_VERSION = "aiml-deck-v25";'));
         [
-          "./auth-config.js?v=24", "./auth-service.js?v=24",
-          "./learning-sync.js?v=24", "./remote-assessment-repository.js?v=24"
+          "./auth-config.js?v=25", "./auth-service.js?v=25",
+          "./learning-sync.js?v=25", "./remote-assessment-repository.js?v=25"
         ].forEach(path => assert(worker.includes(`"${path}"`), `missing worker entry ${path}`));
         assert(worker.includes("self.skipWaiting()"), "new worker does not activate promptly");
         assert(worker.includes("keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))"), "old caches are not removed");
@@ -1056,7 +1108,7 @@
           "./auth-config.js", "./auth-service.js", "./learning-sync.js", "./remote-assessment-repository.js"
         ]);
         equal(requested.length, 4);
-        assert(requested.every(path => path.includes("?v=24") && !oldV22Keys.has(path)), "a v24 request reuses a v22 cache key");
+        assert(requested.every(path => path.includes("?v=25") && !oldV22Keys.has(path)), "a v25 request reuses a v22 cache key");
       });
 
       test("T119: emergency recovery package has isolated cache keys and disables cloud configuration", async () => {
@@ -1065,10 +1117,10 @@
           fetchText("../recovery-dist/sw.js"),
           fetchText("../recovery-dist/auth-config.js")
         ]);
-        assert(html.includes("auth-service.js?v=24-recovery-1"));
-        assert(html.includes("learning-sync.js?v=24-recovery-1"));
-        assert(worker.includes('const CACHE_VERSION = "aiml-deck-recovery-v1";'));
-        assert(worker.includes("./auth-config.js?v=24-recovery-1"));
+        assert(html.includes("auth-service.js?v=25-recovery-2"));
+        assert(html.includes("learning-sync.js?v=25-recovery-2"));
+        assert(worker.includes('const CACHE_VERSION = "aiml-deck-recovery-v2";'));
+        assert(worker.includes("./auth-config.js?v=25-recovery-2"));
         assert(config.includes('supabaseUrl: ""') && config.includes('supabasePublishableKey: ""'));
       });
 
