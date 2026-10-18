@@ -1315,14 +1315,17 @@
         formUrl: "https://tally.so/r/beta-test",
         questionIdField: "question_id"
       });
-      const clickWithoutNavigation = link => {
-        link.addEventListener("click", event => event.preventDefault(), { capture: true, once: true });
-        link.click();
-      };
-
-      test("T141: beta feedback is disabled by default", () => {
-        equal(app.AIML_FEEDBACK_CONFIG, { enabled: false, formUrl: "", questionIdField: "" });
-        assert(!app.document.getElementById("feedback-open"));
+      test("T141: production beta feedback configuration is enabled and rendered", () => {
+        equal(app.AIML_FEEDBACK_CONFIG, {
+          enabled: true,
+          formUrl: "https://tally.so/r/EqzE8N",
+          questionIdField: "question_id"
+        });
+        assert(app.document.getElementById("feedback-open"));
+        equal(
+          api.buildFeedbackUrl(app.AIML_FEEDBACK_CONFIG, ids[0]),
+          `https://tally.so/r/EqzE8N?question_id=${ids[0]}`
+        );
       });
 
       test("T142: enabled feedback with a missing URL remains hidden", () => {
@@ -1336,10 +1339,9 @@
         assert(link.textContent.includes("Feedback"));
       });
 
-      test("T144: anonymous users can open the configured feedback form", () => {
+      test("T144: anonymous users can access the configured feedback form", () => {
         app.eval("currentLearningUserId = null");
         const link = api.initializeFeedback(enabledFeedback);
-        clickWithoutNavigation(link);
         equal(new URL(link.href).origin, "https://tally.so");
       });
 
@@ -1347,16 +1349,14 @@
         const anonymousHref = api.initializeFeedback(enabledFeedback).href;
         app.eval('currentLearningUserId = "feedback_test_user"');
         const signedInLink = api.initializeFeedback(enabledFeedback);
-        clickWithoutNavigation(signedInLink);
         equal(signedInLink.href, anonymousHref);
         app.eval("currentLearningUserId = null");
       });
 
-      test("T146: feedback opening requires no authentication or import workflow", () => {
+      test("T146: feedback access requires no authentication or import workflow", () => {
         const beforeProgress = app.localStorage.getItem(api.PROGRESS_KEY);
         const beforeDialog = app.document.getElementById("claim-dialog").open;
-        const link = api.initializeFeedback(enabledFeedback);
-        clickWithoutNavigation(link);
+        api.initializeFeedback(enabledFeedback);
         equal(app.localStorage.getItem(api.PROGRESS_KEY), beforeProgress);
         equal(app.document.getElementById("claim-dialog").open, beforeDialog);
       });
@@ -1400,11 +1400,10 @@
         app.eval("currentLearningUserId = null");
       });
 
-      test("T152: opening feedback does not alter study-session state", () => {
+      test("T152: rendering feedback does not alter study-session state", () => {
         const beforeRaw = app.localStorage.getItem(api.SESSION_KEY);
         const beforeSession = api.loadSession();
-        const link = api.initializeFeedback(enabledFeedback);
-        clickWithoutNavigation(link);
+        api.initializeFeedback(enabledFeedback);
         equal(app.localStorage.getItem(api.SESSION_KEY), beforeRaw);
         equal(api.loadSession(), beforeSession);
       });

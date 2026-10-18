@@ -85,8 +85,7 @@ category. After changing `index.html` or any asset, bump `CACHE_VERSION` in `sw.
 
 ## Beta feedback configuration
 
-Beta feedback is disabled by default. Create and publish the feedback form in Tally,
-then edit only the browser-safe values in `feedback-config.js`:
+Beta feedback is controlled through the browser-safe values in `feedback-config.js`:
 
 ```js
 window.AIML_FEEDBACK_CONFIG = Object.freeze({
@@ -133,7 +132,7 @@ local learning data without network access. Schema-5 and synchronization tests u
 in-memory storage and mocked Supabase responses to cover safe migration,
 interruption, account isolation, anonymous import decisions, remote pagination,
 duplicate and conflict handling, retries, stale responses, and deterministic
-local/cloud merging. They also verify the disabled-by-default feedback configuration,
+local/cloud merging. They also verify the configured feedback integration,
 HTTPS-only external destination, anonymous and signed-in parity, protected new-tab
 behavior, optional immutable-question context, data minimization, session preservation,
 and responsive touch sizing.

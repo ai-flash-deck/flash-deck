@@ -6,8 +6,8 @@
   "use strict";
 
   global.AIML_FEEDBACK_CONFIG = Object.freeze({
-    enabled: false,
-    formUrl: "",
-    questionIdField: ""
+    enabled: true,
+    formUrl: "https://tally.so/r/EqzE8N",
+    questionIdField: "question_id"
   });
 })(window);
