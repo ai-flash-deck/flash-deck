@@ -169,6 +169,23 @@
     margin: 0 0 14px;
   }
   .eyebrow .sig { color: var(--amber); margin-right: 10px; }
+  .beta-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 10px;
+    padding: 3px 6px;
+    border: 1px solid var(--teal-deep);
+    border-radius: 999px;
+    color: var(--teal);
+    background: rgba(55, 194, 168, .08);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: .12em;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .beta-badge[hidden] { display: none; }
 
   h1 {
     font-size: clamp(2rem, 5vw, 3.25rem);
@@ -305,6 +322,28 @@
   }
   .topic-progress-row b { color: var(--light); font-weight: 600; }
   .topic-progress-row span:last-child { text-align: right; }
+  .topic-progress-invitation {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 10px;
+    padding: 12px;
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+  }
+  .topic-progress-invitation[hidden] { display: none; }
+  .topic-progress-invitation strong {
+    display: block;
+    color: var(--light);
+    font-size: 13px;
+  }
+  .topic-progress-invitation p {
+    margin: 3px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.4;
+  }
   .learning-history-status {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -314,6 +353,7 @@
     padding-top: 13px;
     border-top: 1px solid var(--panel-line);
   }
+  .learning-history-status[hidden] { display: none; }
   .learning-history-icon {
     width: 8px;
     height: 8px;
@@ -836,6 +876,8 @@
     .progress-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .topic-progress-row { display: grid; gap: 3px; }
     .topic-progress-row span:last-child { text-align: left; }
+    .topic-progress-invitation { align-items: stretch; flex-direction: column; }
+    .topic-progress-invitation .session-button { width: 100%; }
     .learning-history-status { grid-template-columns: auto minmax(0, 1fr); }
     .learning-history-signin { grid-column: 2; justify-self: start; }
     .session-panel { padding: 15px; }
@@ -859,7 +901,7 @@
       <button class="account-button" id="auth-open" type="button" hidden>Sign In</button>
       <button class="account-button" id="auth-signout" type="button" hidden>Sign Out</button>
     </div>
-    <p class="eyebrow"><span class="sig">●</span> Machine Learning · Technical Interview Prep</p>
+    <p class="eyebrow"><span class="sig">●</span> Machine Learning · Technical Interview Prep <span class="beta-badge" id="beta-badge" hidden>BETA</span></p>
     <h1>Prepare for your next <em>AI/ML technical interview.</em></h1>
     <p class="lede">Practice curated questions across machine learning, probability, deep learning, Transformers, LLMs, and reinforcement learning.</p>
     <a class="start" href="#grid">Start Practicing <span aria-hidden="true">↓</span></a>
@@ -981,6 +1023,13 @@
       <div class="progress-metric"><b id="progress-known"></b><span>Known</span></div>
       <div class="progress-metric"><b id="progress-review"></b><span>Needs Review</span></div>
       <div class="progress-metric"><b id="progress-percent"></b><span>Known %</span></div>
+    </div>
+    <div class="topic-progress-invitation" id="topic-progress-invitation" hidden>
+      <div>
+        <strong>See your progress by topic and save your learning history</strong>
+        <p>Sign in to view your topic-level performance and access your learning history across devices.</p>
+      </div>
+      <button class="session-button primary" id="topic-progress-signin" type="button">Sign in</button>
     </div>
     <div class="topic-progress" id="topic-progress" aria-label="Progress by topic" hidden></div>
     <div class="learning-history-status" id="learning-history-status" data-state="anonymous" role="status" aria-live="polite" aria-atomic="true">
@@ -4998,6 +5047,12 @@ const SESSION_TYPES = Object.freeze({
   full: Object.freeze({ id: "full", label: "Full Practice", length: 30 })
 });
 
+// Presentation-only switch. Changing it requires a normal application redeployment.
+const UI_FEATURE_FLAGS = Object.freeze({
+  requireSignInForTopicProgress: true,
+  showBetaBadge: true
+});
+
 // Frozen compatibility map generated from the pre-migration category/question text.
 const LEGACY_QUESTION_ID_MAP = new Map([
   ["card_1em2ulm", "q_0001"],
@@ -5595,6 +5650,18 @@ function deriveProgressByTopic(cards, assessmentEvents) {
   return TOPICS.map(topic => deriveTopicProgress(cards, assessmentEvents, topic.id));
 }
 
+function deriveTopicProgressPresentation({
+  authenticated = false,
+  loading = false,
+  requireSignInForTopicProgress = UI_FEATURE_FLAGS.requireSignInForTopicProgress
+} = {}) {
+  const restricted = requireSignInForTopicProgress && !authenticated;
+  return {
+    showDetails: !loading && !restricted,
+    showInvitation: !loading && restricted
+  };
+}
+
 function deriveLearningHistoryStatus({
   authenticated = false,
   loading = false,
@@ -5685,10 +5752,13 @@ const sessionCardHost = document.getElementById("session-card-host");
 const sessionHint = document.getElementById("session-hint");
 const nextQuestion = document.getElementById("next-question");
 const sessionSummary = document.getElementById("session-summary");
+const betaBadge = document.getElementById("beta-badge");
 const browseView = document.getElementById("browse-view");
 const progressEmpty = document.getElementById("progress-empty");
 const progressMetrics = document.getElementById("progress-metrics");
 const topicProgress = document.getElementById("topic-progress");
+const topicProgressInvitation = document.getElementById("topic-progress-invitation");
+const topicProgressSignIn = document.getElementById("topic-progress-signin");
 const progressPracticeWeak = document.getElementById("progress-practice-weak");
 const learningHistoryStatus = document.getElementById("learning-history-status");
 const learningHistoryHeading = document.getElementById("learning-history-heading");
@@ -5811,13 +5881,27 @@ function refreshSessionLauncher() {
   }
 }
 
-function renderProgress() {
-  renderLearningHistoryStatus();
+function renderBetaBadge({ showBetaBadge = UI_FEATURE_FLAGS.showBetaBadge } = {}) {
+  betaBadge.hidden = !showBetaBadge;
+  return showBetaBadge;
+}
+
+function renderProgress({
+  requireSignInForTopicProgress = UI_FEATURE_FLAGS.requireSignInForTopicProgress
+} = {}) {
+  const learningHistory = renderLearningHistoryStatus();
+  const topicPresentation = deriveTopicProgressPresentation({
+    authenticated: Boolean(currentLearningUserId),
+    loading: learningContextLoading,
+    requireSignInForTopicProgress
+  });
+  learningHistoryStatus.hidden = topicPresentation.showInvitation && learningHistory.state === "anonymous";
   if (learningContextLoading) {
     progressEmpty.hidden = false;
     progressEmpty.textContent = "Loading saved progress…";
     progressMetrics.hidden = true;
     topicProgress.hidden = true;
+    topicProgressInvitation.hidden = true;
     progressPracticeWeak.hidden = true;
     topicProgress.innerHTML = "";
     return null;
@@ -5827,7 +5911,8 @@ function renderProgress() {
   progressEmpty.textContent = "Start practicing to build your progress.";
   progressEmpty.hidden = hasProgress;
   progressMetrics.hidden = !hasProgress;
-  topicProgress.hidden = !hasProgress;
+  topicProgress.hidden = !hasProgress || !topicPresentation.showDetails;
+  topicProgressInvitation.hidden = !topicPresentation.showInvitation;
   progressPracticeWeak.hidden = overall.needsReview === 0 || session?.status === "active";
   if (!hasProgress) {
     topicProgress.innerHTML = "";
@@ -5838,14 +5923,18 @@ function renderProgress() {
   document.getElementById("progress-known").textContent = overall.known;
   document.getElementById("progress-review").textContent = overall.needsReview;
   document.getElementById("progress-percent").textContent = `${overall.knownPercent}%`;
-  topicProgress.innerHTML = deriveProgressByTopic(CARDS, progress.assessmentEvents)
-    .filter(topic => topic.questionsPracticed > 0)
-    .map(topic => `
-      <div class="topic-progress-row">
-        <b>${topic.topicName}</b>
-        <span>${topic.questionsPracticed} / ${topic.totalQuestions} Practiced · ${topic.known} Known · ${topic.needsReview} Needs Review · ${topic.knownPercent}% Known</span>
-      </div>`)
-    .join("");
+  if (topicPresentation.showDetails) {
+    topicProgress.innerHTML = deriveProgressByTopic(CARDS, progress.assessmentEvents)
+      .filter(topic => topic.questionsPracticed > 0)
+      .map(topic => `
+        <div class="topic-progress-row">
+          <b>${topic.topicName}</b>
+          <span>${topic.questionsPracticed} / ${topic.totalQuestions} Practiced · ${topic.known} Known · ${topic.needsReview} Needs Review · ${topic.knownPercent}% Known</span>
+        </div>`)
+      .join("");
+  } else {
+    topicProgress.innerHTML = "";
+  }
   return overall;
 }
 
@@ -6383,6 +6472,7 @@ async function initializeAuthentication() {
 
 authOpen.addEventListener("click", showAuthDialog);
 learningHistorySignIn.addEventListener("click", showAuthDialog);
+topicProgressSignIn.addEventListener("click", showAuthDialog);
 document.getElementById("auth-close").addEventListener("click", closeAuthDialog);
 authDialog.addEventListener("click", event => {
   if (event.target === authDialog) closeAuthDialog();
@@ -6483,6 +6573,7 @@ window.addEventListener("online", () => {
   if (currentLearningUserId && syncCoordinator) void syncCoordinator.syncPending(currentLearningUserId);
 });
 
+renderBetaBadge();
 populateSessionTopics();
 render();
 if (session?.status === "completed") showSummary();

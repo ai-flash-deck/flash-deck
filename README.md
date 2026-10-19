@@ -105,6 +105,25 @@ Set `enabled` to `false` to remove the entry from the UI without changing applic
 code. To remove the integration entirely later, remove `feedback-config.js` from the
 HTML, service-worker app shell, release allowlist, and the feedback styles/functions/tests.
 
+## Topic progress visibility
+
+The presentation-only `UI_FEATURE_FLAGS.requireSignInForTopicProgress` switch is
+defined near the other application constants in `index.html`. Its default value is
+`true`, which keeps the four overall progress metrics available to anonymous users
+while replacing topic-level rows and the duplicate device-save prompt with one sign-in
+invitation. Set it to
+`false` to restore the unrestricted topic breakdown. Changing this source value does
+not migrate or alter learning data, but it requires a normal application redeployment
+before users see the new behavior.
+
+## Beta indicator
+
+The presentation-only `UI_FEATURE_FLAGS.showBetaBadge` switch is defined beside the
+topic-progress flag in `index.html`. Its default value is `true`, which displays the
+small `BETA` label beside the existing header identity. Set it to `false` to remove
+the label completely. Changing this source value requires a normal application
+redeployment before users see the new behavior.
+
 ## Test locally
 
 ### Automated regression tests
@@ -117,7 +136,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
 
 The runner starts a temporary loopback-only static server and uses the installed
 Microsoft Edge JavaScript runtime. It does not install packages or access the
-internet. The 154 tests cover the 205 immutable question IDs, stable topic IDs,
+internet. The 174 tests cover the 205 immutable question IDs, stable topic IDs,
 canonical assessment semantics, reveal and duplicate guards, Quick and Full
 session selection, result calculation, multi-session assessment history, derived
 status and counters, reload persistence, legacy ID and storage-schema migration,

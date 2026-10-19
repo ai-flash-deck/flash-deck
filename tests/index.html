@@ -29,7 +29,7 @@
       if (!event.currentTarget.src.includes("/index.html")) return;
       const app = event.currentTarget.contentWindow;
       const api = app.eval(`({
-        CARDS, TOPICS, topicsById, SESSION_TYPES, LEGACY_QUESTION_ID_MAP, PERSISTENCE_SCHEMA_VERSION, SESSION_SCHEMA_VERSION,
+        CARDS, TOPICS, topicsById, SESSION_TYPES, UI_FEATURE_FLAGS, LEGACY_QUESTION_ID_MAP, PERSISTENCE_SCHEMA_VERSION, SESSION_SCHEMA_VERSION,
         PROGRESS_KEY, PROGRESS_STAGING_KEY, SESSION_KEY, storageRepository, cardId, cardsById,
         resolvePersistedQuestionId, migrateResponseKeys, migrateProgressRecord,
         migrateSessionRecord, loadProgress, loadSession, createSessionState,
@@ -37,8 +37,8 @@
         assessQuestionPresentation, makeCard, progress, assessmentHistoryRepository,
         deriveQuestionProgress, isValidAssessmentEvent, getWeakQuestions,
         startWeakSession, deriveOverallProgress, deriveTopicProgress,
-        deriveProgressByTopic, deriveLearningHistoryStatus, renderLearningHistoryStatus,
-        renderProgress, renderSyncState, handleAuthState, localAssessmentRepository,
+        deriveProgressByTopic, deriveTopicProgressPresentation, deriveLearningHistoryStatus, renderLearningHistoryStatus,
+        renderBetaBadge, renderProgress, renderSyncState, handleAuthState, localAssessmentRepository,
         refreshActiveProgress, saveAssessment,
         normalizeFeedbackConfig, buildFeedbackUrl, getActiveFeedbackQuestionId,
         initializeFeedback
@@ -1421,6 +1421,256 @@
         assert(app.document.getElementById("feedback-open"));
         equal(api.initializeFeedback({ enabled: false, formUrl: enabledFeedback.formUrl }), null);
         assert(!app.document.getElementById("feedback-open"));
+      });
+
+      const topicVisibilityEvents = api.TOPICS.map((topic, index) => {
+        const card = cards.find(candidate => candidate.topicId === topic.id);
+        return eventRecord(card.id, index % 2 ? "needs_review" : "known", null, `2026-10-18T00:0${index}:00.000Z`);
+      });
+      const withTopicVisibilityState = async ({
+        userId = null,
+        loading = false,
+        flag = true,
+        events = topicVisibilityEvents
+      } = {}, run) => {
+        const originalEvents = [...api.progress.assessmentEvents];
+        const originalUserId = app.eval("currentLearningUserId");
+        const originalLoading = app.eval("learningContextLoading");
+        const originalSyncState = app.eval("currentSyncState");
+        const originalSessionState = app.eval("session");
+        try {
+          api.progress.assessmentEvents.splice(0, api.progress.assessmentEvents.length, ...events);
+          app.__topicVisibilityUserId = userId;
+          app.eval("currentLearningUserId = window.__topicVisibilityUserId; learningContextLoading = false; currentSyncState = 'idle'; session = null");
+          if (loading) app.eval("learningContextLoading = true");
+          api.renderProgress({ requireSignInForTopicProgress: flag });
+          return await run();
+        } finally {
+          api.progress.assessmentEvents.splice(0, api.progress.assessmentEvents.length, ...originalEvents);
+          app.__topicVisibilityUserId = originalUserId;
+          app.__topicVisibilitySession = originalSessionState;
+          app.__topicVisibilityLoading = originalLoading;
+          app.__topicVisibilitySyncState = originalSyncState;
+          app.eval("currentLearningUserId = window.__topicVisibilityUserId; session = window.__topicVisibilitySession; learningContextLoading = window.__topicVisibilityLoading; currentSyncState = window.__topicVisibilitySyncState; closeAuthDialog(); closeClaimDialog()");
+          api.renderProgress();
+          delete app.__topicVisibilityUserId;
+          delete app.__topicVisibilitySession;
+          delete app.__topicVisibilityLoading;
+          delete app.__topicVisibilitySyncState;
+        }
+      };
+
+      test("T155: anonymous restricted progress shows one combined sign-in invitation", async () => {
+        await withTopicVisibilityState({ flag: true }, () => {
+          equal(api.UI_FEATURE_FLAGS.requireSignInForTopicProgress, true);
+          const metrics = app.document.getElementById("progress-metrics");
+          assert(!metrics.hidden);
+          equal([...metrics.querySelectorAll("span")].map(node => node.textContent), ["Practiced", "Known", "Needs Review", "Known %"]);
+          assert(app.document.getElementById("topic-progress").hidden);
+          equal(app.document.querySelectorAll(".topic-progress-row").length, 0);
+          const invitation = app.document.getElementById("topic-progress-invitation");
+          const saveStatus = app.document.getElementById("learning-history-status");
+          assert(!invitation.hidden);
+          assert(saveStatus.hidden);
+          equal([invitation, saveStatus].filter(node => !node.hidden).length, 1);
+          equal(app.document.getElementById("topic-progress-signin").textContent, "Sign in");
+        });
+      });
+
+      test("T156: disabling the restriction restores anonymous topic progress and save status", async () => {
+        await withTopicVisibilityState({ flag: false }, () => {
+          assert(!app.document.getElementById("topic-progress").hidden);
+          equal(app.document.querySelectorAll(".topic-progress-row").length, 5);
+          assert(app.document.getElementById("topic-progress-invitation").hidden);
+          assert(!app.document.getElementById("learning-history-status").hidden);
+          assert(!app.document.getElementById("learning-history-signin").hidden);
+        });
+      });
+
+      test("T157: authenticated users see topic progress when the restriction is enabled", async () => {
+        await withTopicVisibilityState({ userId: "topic_user", flag: true }, () => {
+          assert(!app.document.getElementById("progress-metrics").hidden);
+          assert(!app.document.getElementById("topic-progress").hidden);
+          equal(app.document.querySelectorAll(".topic-progress-row").length, 5);
+          assert(app.document.getElementById("topic-progress-invitation").hidden);
+          assert(!app.document.getElementById("learning-history-status").hidden);
+        });
+      });
+
+      test("T158: authenticated users see topic progress when the restriction is disabled", async () => {
+        await withTopicVisibilityState({ userId: "topic_user", flag: false }, () => {
+          assert(!app.document.getElementById("topic-progress").hidden);
+          equal(app.document.querySelectorAll(".topic-progress-row").length, 5);
+          assert(app.document.getElementById("topic-progress-invitation").hidden);
+          assert(!app.document.getElementById("learning-history-status").hidden);
+        });
+      });
+
+      test("T159: topic invitation invokes the existing sign-in dialog", async () => {
+        await withTopicVisibilityState({ flag: true }, () => {
+          app.eval("closeAuthDialog")();
+          app.document.getElementById("topic-progress-signin").click();
+          assert(app.document.getElementById("auth-dialog").hasAttribute("open"));
+        });
+      });
+
+      test("T160: visibility changes do not modify anonymous progress or storage", async () => {
+        await withTopicVisibilityState({ flag: true }, () => {
+          const beforeEvents = JSON.stringify(api.progress.assessmentEvents);
+          const beforeRepository = api.localAssessmentRepository.snapshot();
+          const beforeStorage = app.localStorage.getItem(api.PROGRESS_KEY);
+          api.renderProgress({ requireSignInForTopicProgress: false });
+          api.renderProgress({ requireSignInForTopicProgress: true });
+          equal(JSON.stringify(api.progress.assessmentEvents), beforeEvents);
+          equal(api.localAssessmentRepository.snapshot(), beforeRepository);
+          equal(app.localStorage.getItem(api.PROGRESS_KEY), beforeStorage);
+        });
+      });
+
+      test("T161: topic sign-in invitation does not import anonymous history", async () => {
+        await withTopicVisibilityState({ flag: true }, () => {
+          const before = api.localAssessmentRepository.snapshot();
+          app.eval("closeAuthDialog(); closeClaimDialog()");
+          app.document.getElementById("topic-progress-signin").click();
+          equal(api.localAssessmentRepository.snapshot(), before);
+          assert(!app.document.getElementById("claim-dialog").hasAttribute("open"));
+        });
+      });
+
+      test("T162: sign-out returns topic progress to anonymous restricted presentation", async () => {
+        await withTopicVisibilityState({ userId: "topic_signout", flag: true }, async () => {
+          equal(app.document.querySelectorAll(".topic-progress-row").length, 5);
+          api.handleAuthState({ status: authApi.AUTH_STATES.anonymous, identity: null, error: null });
+          await new Promise(resolve => app.setTimeout(resolve, 0));
+          assert(app.document.getElementById("topic-progress").hidden);
+          equal(app.document.querySelectorAll(".topic-progress-row").length, 0);
+          assert(!app.document.getElementById("topic-progress-invitation").hidden);
+          assert(app.document.getElementById("learning-history-status").hidden);
+        });
+      });
+
+      test("T163: Weak Areas remains available to anonymous users", async () => {
+        await withTopicVisibilityState({ flag: true }, () => {
+          assert(!app.document.getElementById("progress-practice-weak").hidden);
+          equal(app.document.getElementById("progress-practice-weak").textContent, "Practice Weak Areas");
+        });
+      });
+
+      test("T164: progress visibility does not change Feedback behavior", async () => {
+        await withTopicVisibilityState({ flag: true }, () => {
+          const link = api.initializeFeedback(app.AIML_FEEDBACK_CONFIG);
+          const before = [link.outerHTML, app.getComputedStyle(link).position, api.buildFeedbackUrl(app.AIML_FEEDBACK_CONFIG, ids[0])];
+          api.renderProgress({ requireSignInForTopicProgress: false });
+          api.renderProgress({ requireSignInForTopicProgress: true });
+          const after = [link.outerHTML, app.getComputedStyle(link).position, api.buildFeedbackUrl(app.AIML_FEEDBACK_CONFIG, ids[0])];
+          equal(after, before);
+        });
+      });
+
+      test("T165: loading state reveals neither topic details nor the invitation", async () => {
+        await withTopicVisibilityState({ userId: "topic_loading", loading: true, flag: true }, () => {
+          assert(app.document.getElementById("progress-metrics").hidden);
+          assert(app.document.getElementById("topic-progress").hidden);
+          assert(app.document.getElementById("topic-progress-invitation").hidden);
+          assert(!app.document.getElementById("learning-history-status").hidden);
+          equal(app.document.getElementById("learning-history-status").dataset.state, "loading");
+          equal(api.deriveTopicProgressPresentation({ authenticated: true, loading: true }), { showDetails: false, showInvitation: false });
+        });
+      });
+
+      test("T166: authentication errors preserve local progress and existing error handling", async () => {
+        await withTopicVisibilityState({ flag: true }, async () => {
+          const beforeRepository = api.localAssessmentRepository.snapshot();
+          const beforeStorage = app.localStorage.getItem(api.PROGRESS_KEY);
+          api.handleAuthState({ status: authApi.AUTH_STATES.error, identity: null, error: { code: "test_error" } });
+          await new Promise(resolve => app.setTimeout(resolve, 0));
+          assert(app.document.getElementById("auth-status").textContent.includes("local practice works"));
+          assert(!app.document.getElementById("topic-progress-invitation").hidden);
+          assert(app.document.getElementById("learning-history-status").hidden);
+          equal(api.localAssessmentRepository.snapshot(), beforeRepository);
+          equal(app.localStorage.getItem(api.PROGRESS_KEY), beforeStorage);
+        });
+      });
+
+      test("T167: progress visibility does not change session result calculation", async () => {
+        await withTopicVisibilityState({ flag: true }, () => {
+          const state = {
+            cardIds: ids.slice(0, 3),
+            responses: {
+              [ids[0]]: eventRecord(ids[0], "known"),
+              [ids[1]]: eventRecord(ids[1], "needs_review"),
+              [ids[2]]: eventRecord(ids[2], "known")
+            }
+          };
+          const before = api.calculateSessionResults(state);
+          api.renderProgress({ requireSignInForTopicProgress: false });
+          api.renderProgress({ requireSignInForTopicProgress: true });
+          equal(api.calculateSessionResults(state), before);
+        });
+      });
+
+      test("T168: enabled Beta flag displays the BETA label", () => {
+        equal(api.UI_FEATURE_FLAGS.showBetaBadge, true);
+        api.renderBetaBadge({ showBetaBadge: true });
+        const badge = app.document.getElementById("beta-badge");
+        assert(!badge.hidden);
+        equal(badge.textContent, "BETA");
+      });
+
+      test("T169: disabled Beta flag hides the label completely", () => {
+        const badge = app.document.getElementById("beta-badge");
+        try {
+          api.renderBetaBadge({ showBetaBadge: false });
+          assert(badge.hidden);
+          equal(app.getComputedStyle(badge).display, "none");
+        } finally {
+          api.renderBetaBadge();
+        }
+      });
+
+      test("T170: Beta label is beside the existing header identity", () => {
+        const badge = app.document.getElementById("beta-badge");
+        const eyebrow = badge.closest("header .eyebrow");
+        assert(eyebrow);
+        assert(badge.previousSibling.textContent.includes("Machine Learning"));
+      });
+
+      test("T171: Beta rendering preserves navigation and sign-in controls", () => {
+        const controls = [
+          app.document.querySelector("header .start"),
+          app.document.getElementById("auth-open"),
+          app.document.getElementById("auth-signout")
+        ];
+        api.renderBetaBadge({ showBetaBadge: false });
+        api.renderBetaBadge({ showBetaBadge: true });
+        assert(controls.every(control => control?.isConnected));
+      });
+
+      test("T172: Beta rendering does not alter progress visibility", () => {
+        const progressState = () => [
+          app.document.getElementById("progress-metrics").hidden,
+          app.document.getElementById("topic-progress").hidden,
+          app.document.getElementById("topic-progress-invitation").hidden,
+          app.document.getElementById("learning-history-status").hidden
+        ];
+        const before = progressState();
+        api.renderBetaBadge({ showBetaBadge: false });
+        api.renderBetaBadge({ showBetaBadge: true });
+        equal(progressState(), before);
+      });
+
+      test("T173: Beta rendering does not alter Feedback behavior", () => {
+        const link = api.initializeFeedback(app.AIML_FEEDBACK_CONFIG);
+        const before = link.outerHTML;
+        api.renderBetaBadge({ showBetaBadge: false });
+        api.renderBetaBadge({ showBetaBadge: true });
+        equal(link.outerHTML, before);
+      });
+
+      test("T174: local production package includes the configured Beta indicator", async () => {
+        const packaged = await fetchText("../dist/index.html");
+        assert(packaged.includes('id="beta-badge"'));
+        assert(packaged.includes("showBetaBadge: true"));
       });
 
       let passed = 0;
