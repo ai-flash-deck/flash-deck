@@ -666,6 +666,37 @@
     100% { box-shadow: 0 0 0 0 rgba(244,166,59,0); }
   }
 
+  /* Locked / preview-only cards */
+  .card.locked { cursor: default; }
+  .card.locked .front { filter: saturate(.45) brightness(.8); }
+  .card.preview { cursor: pointer; }
+  .lock-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: rgba(10, 18, 34, 0.55);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    color: var(--light);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 16px;
+  }
+  .lock-overlay svg { width: 34px; height: 34px; color: var(--amber); }
+  .lock-overlay .lock-sub {
+    color: var(--muted);
+    letter-spacing: .05em;
+    text-transform: none;
+    font-size: 11px;
+  }
+
   /* Back */
   .back {
     transform: rotateY(180deg);
@@ -6073,13 +6104,22 @@ function buildChips() {
   });
 }
 
+const FREE_PREVIEW_PER_TOPIC = 5;
+
 function render() {
   feedbackBrowseQuestionId = null;
   buildChips();
   grid.innerHTML = "";
+  const topicCounts = new Map();
+  const cardTopicIndex = new Map();
+  CARDS.forEach(c => {
+    const i = topicCounts.get(c.topicId) || 0;
+    topicCounts.set(c.topicId, i + 1);
+    cardTopicIndex.set(c.id, i);
+  });
   const list = CARDS.filter(c => activeTopicId === "all" || c.topicId === activeTopicId);
-  list.forEach(c => grid.appendChild(makeCard(c)));
-  countEl.innerHTML = `Showing <b>${list.length}</b> / ${CARDS.length} cards`;
+  list.forEach(c => grid.appendChild(makeCard(c, { locked: cardTopicIndex.get(c.id) >= FREE_PREVIEW_PER_TOPIC })));
+  countEl.innerHTML = `Showing <b>${list.length}</b> / ${CARDS.length} cards &mdash; first ${FREE_PREVIEW_PER_TOPIC} per topic are a free preview, start a session to practice`;
 }
 
 function makeCard(c, options = {}) {
@@ -6089,18 +6129,41 @@ function makeCard(c, options = {}) {
     ? options.selectedResult
     : deriveQuestionProgress(progress.assessmentEvents, id).currentStatus || "";
   const topic = topicsById.get(c.topicId);
-  card.className = "card";
+  const cls = topic?.className || "";
+
+  if (options.locked) {
+    card.className = "card locked";
+    card.setAttribute("aria-label", "Locked flashcard: " + c.q);
+    card.innerHTML = `
+      <div class="inner">
+        <div class="face front">
+          <span class="tag ${cls}">${topic?.name || c.cat}</span>
+          <p class="q">${c.q}</p>
+          <span class="reveal"><span class="dot"></span> Locked</span>
+        </div>
+      </div>
+      <div class="lock-overlay" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <span>Locked</span>
+        <span class="lock-sub">Full deck coming soon</span>
+      </div>`;
+    return card;
+  }
+
+  const canFlip = Boolean(options.sessionId);
+  card.className = canFlip ? "card" : "card preview";
   card.setAttribute("role", "button");
   card.setAttribute("tabindex", "0");
-  card.setAttribute("aria-label", "Flashcard: " + c.q + ". Activate to reveal answer.");
+  card.setAttribute("aria-label", canFlip
+    ? "Flashcard: " + c.q + ". Activate to reveal answer."
+    : "Flashcard: " + c.q + ". Start a session to reveal the answer.");
 
-  const cls = topic?.className || "";
   card.innerHTML = `
     <div class="inner">
       <div class="face front" aria-hidden="false">
         <span class="tag ${cls}">${topic?.name || c.cat}</span>
         <p class="q">${c.q}</p>
-        <span class="reveal"><span class="dot"></span> Tap to reveal answer</span>
+        <span class="reveal"><span class="dot"></span> ${canFlip ? "Tap to reveal answer" : "Start a session to reveal"}</span>
       </div>
       <div class="face back" aria-hidden="true" inert>
         <div class="back-head">
@@ -6129,6 +6192,7 @@ function makeCard(c, options = {}) {
   let revealed = false;
   let presentationEvent = options.initialEvent || null;
   const flip = (state) => {
+    if (!canFlip) return;
     if (state) revealed = true;
     if (!options.sessionId) {
       if (state) feedbackBrowseQuestionId = id;
@@ -6141,39 +6205,48 @@ function makeCard(c, options = {}) {
     front.inert = state;
     back.inert = !state;
   };
+  const promptSessionStart = () => {
+    sessionPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
-  front.addEventListener("click", () => flip(true));
-  card.querySelector(".flip-back").addEventListener("click", (e) => { e.stopPropagation(); flip(false); });
-  card.querySelector(".back-scroll").addEventListener("click", (e) => e.stopPropagation());
-  card.querySelectorAll(".assessment-option").forEach(option => {
-    option.addEventListener("click", () => {
-      const result = option.dataset.result;
-      const assessment = assessQuestionPresentation({
-        revealed,
-        previousEvent: presentationEvent,
-        questionId: id,
-        sessionId: options.sessionId || null,
-        result
-      });
-      if (!assessment.recorded) return;
-      const saved = saveAssessment(assessment.event);
-      if (!saved) {
-        card.querySelector(".assessment-status").textContent = "Your response could not be saved in this browser.";
-        return;
-      }
-      presentationEvent = assessment.event;
-      card.querySelectorAll(".assessment-option").forEach(button => {
-        button.setAttribute("aria-pressed", button === option);
-      });
-      if (typeof options.onAssess === "function") options.onAssess(assessment.event);
-      renderProgress();
-      card.querySelector(".assessment-status").textContent = `${option.textContent} saved.`;
-    });
+  front.addEventListener("click", () => {
+    if (canFlip) flip(true);
+    else promptSessionStart();
   });
+  if (canFlip) {
+    card.querySelector(".flip-back").addEventListener("click", (e) => { e.stopPropagation(); flip(false); });
+    card.querySelector(".back-scroll").addEventListener("click", (e) => e.stopPropagation());
+    card.querySelectorAll(".assessment-option").forEach(option => {
+      option.addEventListener("click", () => {
+        const result = option.dataset.result;
+        const assessment = assessQuestionPresentation({
+          revealed,
+          previousEvent: presentationEvent,
+          questionId: id,
+          sessionId: options.sessionId || null,
+          result
+        });
+        if (!assessment.recorded) return;
+        const saved = saveAssessment(assessment.event);
+        if (!saved) {
+          card.querySelector(".assessment-status").textContent = "Your response could not be saved in this browser.";
+          return;
+        }
+        presentationEvent = assessment.event;
+        card.querySelectorAll(".assessment-option").forEach(button => {
+          button.setAttribute("aria-pressed", button === option);
+        });
+        if (typeof options.onAssess === "function") options.onAssess(assessment.event);
+        renderProgress();
+        card.querySelector(".assessment-status").textContent = `${option.textContent} saved.`;
+      });
+    });
+  }
   card.addEventListener("keydown", (e) => {
     if (e.target === card && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
-      flip(!card.classList.contains("flipped"));
+      if (canFlip) flip(!card.classList.contains("flipped"));
+      else promptSessionStart();
     }
   });
 
