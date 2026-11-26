@@ -6149,20 +6149,18 @@ function makeCard(c, options = {}) {
     return card;
   }
 
-  const canFlip = Boolean(options.sessionId);
-  card.className = canFlip ? "card" : "card preview";
+  const canAssess = Boolean(options.sessionId);
+  card.className = canAssess ? "card" : "card preview";
   card.setAttribute("role", "button");
   card.setAttribute("tabindex", "0");
-  card.setAttribute("aria-label", canFlip
-    ? "Flashcard: " + c.q + ". Activate to reveal answer."
-    : "Flashcard: " + c.q + ". Start a session to reveal the answer.");
+  card.setAttribute("aria-label", "Flashcard: " + c.q + ". Activate to reveal answer.");
 
   card.innerHTML = `
     <div class="inner">
       <div class="face front" aria-hidden="false">
         <span class="tag ${cls}">${topic?.name || c.cat}</span>
         <p class="q">${c.q}</p>
-        <span class="reveal"><span class="dot"></span> ${canFlip ? "Tap to reveal answer" : "Start a session to reveal"}</span>
+        <span class="reveal"><span class="dot"></span> Tap to reveal answer</span>
       </div>
       <div class="face back" aria-hidden="true" inert>
         <div class="back-head">
@@ -6175,14 +6173,14 @@ function makeCard(c, options = {}) {
             &#128279; ${c.src} <span class="arrow">&#8599;</span>
           </a>
         </div>
-          <fieldset class="assessment">
+          ${canAssess ? `<fieldset class="assessment">
             <legend>How well did you know this?</legend>
             <div class="assessment-options">
               <button class="assessment-option" type="button" data-result="needs_review" aria-pressed="${selectedResult === "needs_review"}">Didn't Know</button>
               <button class="assessment-option" type="button" data-result="known" aria-pressed="${selectedResult === "known"}">Knew It</button>
             </div>
             <span class="assessment-status sr-only" aria-live="polite"></span>
-          </fieldset>
+          </fieldset>` : ""}
       </div>
     </div>`;
 
@@ -6191,7 +6189,6 @@ function makeCard(c, options = {}) {
   let revealed = false;
   let presentationEvent = options.initialEvent || null;
   const flip = (state) => {
-    if (!canFlip) return;
     if (state) revealed = true;
     if (!options.sessionId) {
       if (state) feedbackBrowseQuestionId = id;
@@ -6204,17 +6201,11 @@ function makeCard(c, options = {}) {
     front.inert = state;
     back.inert = !state;
   };
-  const promptSessionStart = () => {
-    sessionPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
 
-  front.addEventListener("click", () => {
-    if (canFlip) flip(true);
-    else promptSessionStart();
-  });
-  if (canFlip) {
-    card.querySelector(".flip-back").addEventListener("click", (e) => { e.stopPropagation(); flip(false); });
-    card.querySelector(".back-scroll").addEventListener("click", (e) => e.stopPropagation());
+  front.addEventListener("click", () => flip(true));
+  card.querySelector(".flip-back").addEventListener("click", (e) => { e.stopPropagation(); flip(false); });
+  card.querySelector(".back-scroll").addEventListener("click", (e) => e.stopPropagation());
+  if (canAssess) {
     card.querySelectorAll(".assessment-option").forEach(option => {
       option.addEventListener("click", () => {
         const result = option.dataset.result;
@@ -6244,8 +6235,7 @@ function makeCard(c, options = {}) {
   card.addEventListener("keydown", (e) => {
     if (e.target === card && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
-      if (canFlip) flip(!card.classList.contains("flipped"));
-      else promptSessionStart();
+      flip(!card.classList.contains("flipped"));
     }
   });
 
