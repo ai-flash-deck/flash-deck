@@ -296,6 +296,7 @@
     justify-content: space-between;
     gap: 12px;
   }
+  .progress-heading-row[hidden] { display: none; }
   .progress-panel h2 { margin: 0; color: var(--light); font-size: 1rem; }
   .progress-metrics {
     display: grid;
@@ -333,6 +334,16 @@
     border-radius: 8px;
   }
   .topic-progress-invitation[hidden] { display: none; }
+  .progress-panel.signed-out .topic-progress-invitation {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .progress-panel.signed-out .topic-progress-invitation p {
+    margin: 0;
+    color: var(--light);
+    font-size: 14px;
+  }
   .topic-progress-invitation strong {
     display: block;
     color: var(--light);
@@ -1043,8 +1054,8 @@
   </section>
 
   <div id="browse-view">
-  <section class="progress-panel" aria-labelledby="progress-heading">
-    <div class="progress-heading-row">
+  <section class="progress-panel" id="progress-panel" aria-labelledby="progress-heading">
+    <div class="progress-heading-row" id="progress-heading-row">
       <h2 id="progress-heading">Your progress</h2>
       <button class="session-button" id="progress-practice-weak" type="button" hidden>Practice Weak Areas</button>
     </div>
@@ -1056,10 +1067,7 @@
       <div class="progress-metric"><b id="progress-percent"></b><span>Known %</span></div>
     </div>
     <div class="topic-progress-invitation" id="topic-progress-invitation" hidden>
-      <div>
-        <strong>See your progress by topic and save your learning history</strong>
-        <p>Sign in to view your topic-level performance and access your learning history across devices.</p>
-      </div>
+      <p>Sign in to view all cards, see your performance by-topic, and save your progress.</p>
       <button class="session-button primary" id="topic-progress-signin" type="button">Sign in</button>
     </div>
     <div class="topic-progress" id="topic-progress" aria-label="Progress by topic" hidden></div>
@@ -5785,6 +5793,8 @@ const nextQuestion = document.getElementById("next-question");
 const sessionSummary = document.getElementById("session-summary");
 const betaBadge = document.getElementById("beta-badge");
 const browseView = document.getElementById("browse-view");
+const progressPanel = document.getElementById("progress-panel");
+const progressHeadingRow = document.getElementById("progress-heading-row");
 const progressEmpty = document.getElementById("progress-empty");
 const progressMetrics = document.getElementById("progress-metrics");
 const topicProgress = document.getElementById("topic-progress");
@@ -5927,6 +5937,9 @@ function renderProgress({
     requireSignInForTopicProgress
   });
   learningHistoryStatus.hidden = topicPresentation.showInvitation && learningHistory.state === "anonymous";
+  const signedOut = topicPresentation.showInvitation;
+  progressPanel.classList.toggle("signed-out", signedOut);
+  progressHeadingRow.hidden = signedOut;
   if (learningContextLoading) {
     progressEmpty.hidden = false;
     progressEmpty.textContent = "Loading saved progress…";
@@ -5940,11 +5953,11 @@ function renderProgress({
   const overall = deriveOverallProgress(CARDS, progress.assessmentEvents);
   const hasProgress = overall.questionsPracticed > 0;
   progressEmpty.textContent = "Start practicing to build your progress.";
-  progressEmpty.hidden = hasProgress;
-  progressMetrics.hidden = !hasProgress;
+  progressEmpty.hidden = hasProgress || signedOut;
+  progressMetrics.hidden = !hasProgress || signedOut;
   topicProgress.hidden = !hasProgress || !topicPresentation.showDetails;
-  topicProgressInvitation.hidden = !topicPresentation.showInvitation;
-  progressPracticeWeak.hidden = overall.needsReview === 0 || session?.status === "active";
+  topicProgressInvitation.hidden = !signedOut;
+  progressPracticeWeak.hidden = signedOut || overall.needsReview === 0 || session?.status === "active";
   if (!hasProgress) {
     topicProgress.innerHTML = "";
     return overall;
