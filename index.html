@@ -5937,7 +5937,7 @@ function renderProgress({
     requireSignInForTopicProgress
   });
   learningHistoryStatus.hidden = topicPresentation.showInvitation && learningHistory.state === "anonymous";
-  const signedOut = topicPresentation.showInvitation;
+  const signedOut = topicPresentation.showInvitation && AIMLAuth.hasPublicAuthConfig(window.AIML_AUTH_CONFIG);
   progressPanel.classList.toggle("signed-out", signedOut);
   progressHeadingRow.hidden = signedOut;
   if (learningContextLoading) {
@@ -5956,7 +5956,7 @@ function renderProgress({
   progressEmpty.hidden = hasProgress || signedOut;
   progressMetrics.hidden = !hasProgress || signedOut;
   topicProgress.hidden = !hasProgress || !topicPresentation.showDetails;
-  topicProgressInvitation.hidden = !signedOut;
+  topicProgressInvitation.hidden = !topicPresentation.showInvitation;
   progressPracticeWeak.hidden = signedOut || overall.needsReview === 0 || session?.status === "active";
   if (!hasProgress) {
     topicProgress.innerHTML = "";
