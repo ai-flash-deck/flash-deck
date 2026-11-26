@@ -296,6 +296,7 @@
     justify-content: space-between;
     gap: 12px;
   }
+  .progress-heading-row[hidden] { display: none; }
   .progress-panel h2 { margin: 0; color: var(--light); font-size: 1rem; }
   .progress-metrics {
     display: grid;
@@ -333,6 +334,16 @@
     border-radius: 8px;
   }
   .topic-progress-invitation[hidden] { display: none; }
+  .progress-panel.signed-out .topic-progress-invitation {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .progress-panel.signed-out .topic-progress-invitation p {
+    margin: 0;
+    color: var(--light);
+    font-size: 14px;
+  }
   .topic-progress-invitation strong {
     display: block;
     color: var(--light);
@@ -696,6 +707,14 @@
     text-transform: none;
     font-size: 11px;
   }
+  .lock-overlay .lock-sub a {
+    color: var(--amber);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .lock-overlay .lock-sub a:hover { color: var(--light); }
+  .lock-overlay .lock-sub a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  body:not(.can-sign-in) .lock-overlay .lock-signin { display: none; }
 
   /* Back */
   .back {
@@ -924,7 +943,7 @@
 <body>
 
 
-<div class="wrap">
+<div class="wrap" id="top">
   <header>
     <div class="account-bar" aria-live="polite">
       <span id="auth-status">Checking sign-in status…</span>
@@ -1043,8 +1062,8 @@
   </section>
 
   <div id="browse-view">
-  <section class="progress-panel" aria-labelledby="progress-heading">
-    <div class="progress-heading-row">
+  <section class="progress-panel" id="progress-panel" aria-labelledby="progress-heading">
+    <div class="progress-heading-row" id="progress-heading-row">
       <h2 id="progress-heading">Your progress</h2>
       <button class="session-button" id="progress-practice-weak" type="button" hidden>Practice Weak Areas</button>
     </div>
@@ -1056,10 +1075,7 @@
       <div class="progress-metric"><b id="progress-percent"></b><span>Known %</span></div>
     </div>
     <div class="topic-progress-invitation" id="topic-progress-invitation" hidden>
-      <div>
-        <strong>See your progress by topic and save your learning history</strong>
-        <p>Sign in to view your topic-level performance and access your learning history across devices.</p>
-      </div>
+      <p>Sign in to view all cards, see your performance by-topic, and save your progress.</p>
       <button class="session-button primary" id="topic-progress-signin" type="button">Sign in</button>
     </div>
     <div class="topic-progress" id="topic-progress" aria-label="Progress by topic" hidden></div>
@@ -5785,6 +5801,8 @@ const nextQuestion = document.getElementById("next-question");
 const sessionSummary = document.getElementById("session-summary");
 const betaBadge = document.getElementById("beta-badge");
 const browseView = document.getElementById("browse-view");
+const progressPanel = document.getElementById("progress-panel");
+const progressHeadingRow = document.getElementById("progress-heading-row");
 const progressEmpty = document.getElementById("progress-empty");
 const progressMetrics = document.getElementById("progress-metrics");
 const topicProgress = document.getElementById("topic-progress");
@@ -5927,6 +5945,9 @@ function renderProgress({
     requireSignInForTopicProgress
   });
   learningHistoryStatus.hidden = topicPresentation.showInvitation && learningHistory.state === "anonymous";
+  const signedOut = topicPresentation.showInvitation && AIMLAuth.hasPublicAuthConfig(window.AIML_AUTH_CONFIG);
+  progressPanel.classList.toggle("signed-out", signedOut);
+  progressHeadingRow.hidden = signedOut;
   if (learningContextLoading) {
     progressEmpty.hidden = false;
     progressEmpty.textContent = "Loading saved progress…";
@@ -5940,11 +5961,11 @@ function renderProgress({
   const overall = deriveOverallProgress(CARDS, progress.assessmentEvents);
   const hasProgress = overall.questionsPracticed > 0;
   progressEmpty.textContent = "Start practicing to build your progress.";
-  progressEmpty.hidden = hasProgress;
-  progressMetrics.hidden = !hasProgress;
+  progressEmpty.hidden = hasProgress || signedOut;
+  progressMetrics.hidden = !hasProgress || signedOut;
   topicProgress.hidden = !hasProgress || !topicPresentation.showDetails;
   topicProgressInvitation.hidden = !topicPresentation.showInvitation;
-  progressPracticeWeak.hidden = overall.needsReview === 0 || session?.status === "active";
+  progressPracticeWeak.hidden = signedOut || overall.needsReview === 0 || session?.status === "active";
   if (!hasProgress) {
     topicProgress.innerHTML = "";
     return overall;
@@ -6142,9 +6163,9 @@ function makeCard(c, options = {}) {
           <span class="reveal"><span class="dot"></span> Locked</span>
         </div>
       </div>
-      <div class="lock-overlay" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-        <span class="lock-sub">Start a study session to view more</span>
+      <div class="lock-overlay">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <span class="lock-sub"><a href="#session-panel">Start a study session</a><span class="lock-signin"> or <a href="#top">sign in</a></span> to view more</span>
       </div>`;
     return card;
   }
@@ -6386,6 +6407,7 @@ function renderAuthState(state) {
   const identity = state?.identity || null;
   const authenticated = Boolean(identity);
   authOpen.hidden = authenticated || state?.status === AIMLAuth.AUTH_STATES.loading;
+  document.body.classList.toggle("can-sign-in", !authOpen.hidden && AIMLAuth.hasPublicAuthConfig(window.AIML_AUTH_CONFIG));
   authSignOut.hidden = !authenticated;
   if (state?.status === AIMLAuth.AUTH_STATES.loading) authStatus.textContent = "Checking sign-in status…";
   else if (state?.status === AIMLAuth.AUTH_STATES.error) authStatus.textContent = authenticated

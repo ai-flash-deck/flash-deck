@@ -1460,12 +1460,13 @@
         }
       };
 
-      test("T155: anonymous restricted progress shows one combined sign-in invitation", async () => {
+      test("T155: anonymous restricted progress shows only the sign-in box", async () => {
         await withTopicVisibilityState({ flag: true }, () => {
           equal(api.UI_FEATURE_FLAGS.requireSignInForTopicProgress, true);
-          const metrics = app.document.getElementById("progress-metrics");
-          assert(!metrics.hidden);
-          equal([...metrics.querySelectorAll("span")].map(node => node.textContent), ["Practiced", "Known", "Needs Review", "Known %"]);
+          assert(app.document.getElementById("progress-panel").classList.contains("signed-out"));
+          assert(app.document.getElementById("progress-heading-row").hidden);
+          assert(app.document.getElementById("progress-empty").hidden);
+          assert(app.document.getElementById("progress-metrics").hidden);
           assert(app.document.getElementById("topic-progress").hidden);
           equal(app.document.querySelectorAll(".topic-progress-row").length, 0);
           const invitation = app.document.getElementById("topic-progress-invitation");
@@ -1474,6 +1475,7 @@
           assert(saveStatus.hidden);
           equal([invitation, saveStatus].filter(node => !node.hidden).length, 1);
           equal(app.document.getElementById("topic-progress-signin").textContent, "Sign in");
+          equal(invitation.querySelector("p").textContent, "Sign in to view all cards, see your performance by-topic, and save your progress.");
         });
       });
 
@@ -1549,8 +1551,13 @@
         });
       });
 
-      test("T163: Weak Areas remains available to anonymous users", async () => {
+      test("T163: Weak Areas progress shortcut is shown only to signed-in users", async () => {
         await withTopicVisibilityState({ flag: true }, () => {
+          assert(app.document.getElementById("progress-practice-weak").hidden);
+        });
+        await withTopicVisibilityState({ userId: "topic_user", flag: true }, () => {
+          assert(!app.document.getElementById("progress-panel").classList.contains("signed-out"));
+          assert(!app.document.getElementById("progress-heading-row").hidden);
           assert(!app.document.getElementById("progress-practice-weak").hidden);
           equal(app.document.getElementById("progress-practice-weak").textContent, "Practice Weak Areas");
         });
