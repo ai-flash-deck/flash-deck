@@ -228,6 +228,7 @@
     border-color: #ffb64d;
   }
   .start:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+  .start[hidden] { display: none; }
 
   /* ---------- Toolbar ---------- */
   .toolbar {
@@ -954,7 +955,7 @@
     <p class="eyebrow"><span class="sig">●</span> Machine Learning · Technical Interview Prep <span class="beta-badge" id="beta-badge" hidden>BETA</span></p>
     <h1>Prepare for your next <em>AI/ML technical interview.</em></h1>
     <p class="lede">Practice curated questions across machine learning, probability, deep learning, Transformers, LLMs, and reinforcement learning.</p>
-    <a class="start" href="#grid">Start Practicing <span aria-hidden="true">↓</span></a>
+    <a class="start" id="start-practicing" href="#grid">Start Practicing <span aria-hidden="true">↓</span></a>
   </header>
 
   <dialog class="auth-dialog" id="auth-dialog" aria-labelledby="auth-heading">
@@ -5801,6 +5802,7 @@ const nextQuestion = document.getElementById("next-question");
 const sessionSummary = document.getElementById("session-summary");
 const betaBadge = document.getElementById("beta-badge");
 const browseView = document.getElementById("browse-view");
+const startPracticing = document.getElementById("start-practicing");
 const progressPanel = document.getElementById("progress-panel");
 const progressHeadingRow = document.getElementById("progress-heading-row");
 const progressEmpty = document.getElementById("progress-empty");
@@ -5995,6 +5997,7 @@ function showDeck() {
   sessionSummary.hidden = true;
   sessionPanel.hidden = false;
   browseView.hidden = false;
+  startPracticing.hidden = false;
   renderProgress();
   refreshSessionLauncher();
 }
@@ -6016,6 +6019,7 @@ function showSession() {
 
   sessionPanel.hidden = true;
   browseView.hidden = true;
+  startPracticing.hidden = true;
   sessionSummary.hidden = true;
   sessionView.hidden = false;
   sessionProgress.textContent = `Question ${session.position + 1} of ${session.cardIds.length}`;
@@ -6073,6 +6077,7 @@ function showSummary() {
   const weakQuestions = getWeakQuestions(CARDS, progress.assessmentEvents);
   sessionPanel.hidden = true;
   browseView.hidden = true;
+  startPracticing.hidden = true;
   sessionView.hidden = true;
   sessionSummary.hidden = false;
   document.getElementById("summary-total").textContent = `${total} Questions Completed`;
