@@ -6145,7 +6145,7 @@ function render() {
   });
   const list = CARDS.filter(c => activeTopicId === "all" || c.topicId === activeTopicId);
   list.forEach(c => grid.appendChild(makeCard(c, { locked: cardTopicIndex.get(c.id) >= FREE_PREVIEW_PER_TOPIC })));
-  countEl.innerHTML = `Showing <b>${list.length}</b> / ${CARDS.length} cards &mdash; first ${FREE_PREVIEW_PER_TOPIC} per topic are a free preview, start a session to practice`;
+  countEl.innerHTML = `Showing <b>${list.length}</b> / ${CARDS.length} cards`;
 }
 
 function makeCard(c, options = {}) {
